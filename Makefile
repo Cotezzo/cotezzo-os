@@ -28,7 +28,10 @@ GDB_SCRIPT_PATH=${BUILD_DIR_PATH}/debug-script.gdb
 GDB_CONFIG="\
 \nset disassembly-flavor intel\
 \ntarget remote | ${EMU} -S -gdb stdio -m 32\
-\nlayout asm"
+\nlayout asm\
+\nb *0x7c00\
+\nc\
+\nx/16xh 0x7dfe"
 
 # ==== ALL =================================================================== #
 # Default behaviour: create build dir, create floppy image from source.
