@@ -1,0 +1,27 @@
+# ==== UNSTABLE FLAGS ======================================================== #
+# Unstable features available with cargo nigthly.
+# These flags can be also passed on the command line as a -Z flag.
+[unstable]
+
+# Custom target not supported, std library not shipped (we use the core crate).
+# To include it, recompile it.
+# Cargo needs access to source code: `rustup component add rust-src`
+build-std = ["core", "compiler_builtins"]
+
+# The compiler assumes certain built-in functions are available for all systems.
+# Most of these are provided by compiler_builtins, but there are some
+# memory-related functions in that crate not enabled by default because they are
+# normally provided by the C library on the system.
+# One could implement the functions with the #[no_mangle] attribute (dangerous).
+# compiler_builtins contains implementations for these functions, they are just
+# disabled by default to not collide with the implementations from the C library.
+build-std-features = ["compiler-builtins-mem"]
+
+# ==== BUILD FLAGS =========================================================== #
+[build]
+# To avoid specifying the --target option with our custom triple .json
+target = "i386-code16-stage-2.json"
+
+#! Not really useful for now, since the binary is stripped from the ELF anyway.
+#. Specify custom linker script for our binary
+#. rustflags = [ "-C", "link-arg=--script=./link.ld" ]

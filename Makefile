@@ -1,30 +1,27 @@
-# Define source and build directory where the .asm and output files are stored.
-SRC_DIR_PATH=./src
-BUILD_DIR_PATH=./build
+# Input target, can be 'all', 'dev', 'release' (ex: make TARGET=release)
+TARGET?=all
 
-# Define source assembly code files and binary outputs.
-BOOTLOADER_PATH=${SRC_DIR_PATH}/bootloader/bootloader.asm
-BOOTLOADER_BIN_PATH=${BUILD_DIR_PATH}/bootloader.bin
-KERNEL_PATH=${SRC_DIR_PATH}/kernel/kernel.asm
-KERNEL_BIN_NAME=kernel.bin
-KERNEL_BIN_PATH=${BUILD_DIR_PATH}/${KERNEL_BIN_NAME}
+# Define bootloader stages target binary location
+STAGE_1_DIR=./bootloader/stage-1
+STAGE_2_DIR=./bootloader/stage-2
+TARGET_STAGE_1_BIN=${STAGE_1_DIR}/target/stage-1.bin
+TARGET_STAGE_2_BIN=${STAGE_2_DIR}/target/stage-2.bin
+
+# Define output image location
+TARGET_DIR=./target
+TARGET_IMG=${TARGET_DIR}/porcheria-os.img
 
 # Define image file, block size and block count (disk dimensions)
 # Our "floppy" has a 1.44MB of memory
-IMAGE_PATH=${BUILD_DIR_PATH}/floppy.img
 BLOCK_SIZE=512
 BLOCK_COUNT=2880	# ~1.47MB
 
-# Define assembler command and options.
-ASM=nasm
-ASM_OPTIONS=-f bin -o
-
 # Define QEMU command; -fda is used to load .img file as a disk.
 # Intel Arch, 32bit (aka i386). ISA: x86-32, 32b version of x86 (16b).
-EMU=qemu-system-i386 -fda ${IMAGE_PATH}
+EMU=qemu-system-i386 -fda ${TARGET_IMG}
 
 # Define .gdb debug script file and content (\ \n for multiline support).
-GDB_SCRIPT_PATH=${BUILD_DIR_PATH}/debug-script.gdb
+GDB_SCRIPT_PATH=${TARGET_DIR}/debug-script.gdb
 GDB_CONFIG="\
 \nset disassembly-flavor intel\
 \ntarget remote | ${EMU} -S -gdb stdio -m 32\
@@ -33,13 +30,10 @@ GDB_CONFIG="\
 \nc\
 \nx/16xh 0x7dfe"
 
-# ==== ALL =================================================================== #
-# Default behaviour: create build dir, create floppy image from source.
-all: ${BUILD_DIR_PATH} ${IMAGE_PATH}
-${BUILD_DIR_PATH}:
-	mkdir -p ${BUILD_DIR_PATH}
+# ==== TARGET ================================================================ #
+# DEFAULT: always clean and create new target image
+all: clean ${TARGET_IMG}
 
-# ==== IMAGE ================================================================= #
 # Create the .img file from bootloader and kernel binaries.
 # 'dd' performes file operations. Create an output file (of) from input file
 # (if) data: /dev/zero is a virtual file which only outputs 0x00 (NULL);
@@ -52,38 +46,43 @@ ${BUILD_DIR_PATH}:
 # be done without mounting the image using the mtools commands (such as mcopy).
 #! This would overwrite the FAT12 headers and break the file system!
 #! The bootloader itself contains a copy of these headers to keep the fs valid.
-${IMAGE_PATH}: ${BOOTLOADER_BIN_PATH} ${KERNEL_BIN_PATH}
-	dd if=/dev/zero of=${IMAGE_PATH} bs=${BLOCK_SIZE} count=${BLOCK_COUNT}
-	mkfs.fat -F 12 ${IMAGE_PATH} -n "MY_NAME"
-	dd if=${BOOTLOADER_BIN_PATH} of=${IMAGE_PATH} conv=notrunc
-	mcopy -i ${IMAGE_PATH} ${KERNEL_BIN_PATH} "::${KERNEL_BIN_NAME}"
+${TARGET_IMG}: ${TARGET_STAGE_1_BIN} ${TARGET_STAGE_2_BIN} ${TARGET_DIR}
+	dd if=/dev/zero of=${TARGET_IMG} bs=${BLOCK_SIZE} count=${BLOCK_COUNT}
+	mkfs.fat -F 12 ${TARGET_IMG} -n "PORK_OS"
+	dd if=${TARGET_STAGE_1_BIN} of=${TARGET_IMG} conv=notrunc
+	mcopy -i ${TARGET_IMG} ${TARGET_STAGE_2_BIN} "::stage-2.bin"
 
-# ==== BOOTLOADER ============================================================ #
 # Create bootloader binary from assembly source.
-${BOOTLOADER_BIN_PATH}: ${BOOTLOADER_PATH}
-	${ASM} ${BOOTLOADER_PATH} ${ASM_OPTIONS} ${BOOTLOADER_BIN_PATH}
+${TARGET_STAGE_1_BIN}:
+	make ${TARGET} -C ${STAGE_1_DIR}
 
-# ==== KERNEL ================================================================ #
 # Create kernel binary from assembly source.
-${KERNEL_BIN_PATH}: ${KERNEL_PATH}
-	${ASM} ${KERNEL_PATH} ${ASM_OPTIONS} ${KERNEL_BIN_PATH}
+${TARGET_STAGE_2_BIN}:
+	make ${TARGET} -C ${STAGE_2_DIR}
+
+# Create target directory for the image
+${TARGET_DIR}:
+	mkdir -p ${TARGET_DIR}
+
+# Create target directory for the bin
+clean:
+	rm -rf ${TARGET_DIR}
+	make clean -C ${STAGE_1_DIR}
+	make clean -C ${STAGE_2_DIR}
 
 # ==== RUN =================================================================== #
 # Build and run os with the defined QEMU command and options.
-run: all
+run: ${TARGET_IMG}
 	${EMU}
 
 # Build and debug os with QEMU and GDB; load .gdb config and scripts.
+dbg: ${TARGET_IMG}
+	echo ${GDB_CONFIG} > ${GDB_SCRIPT_PATH}
+	gdb -tui -x ${GDB_SCRIPT_PATH}
+
 # Useful debugging commands:
 # SET BREAKPOINT:                               b *0x7c00
 # VIEW REGISTERS VALUE:                         i r ax bx cx dx si di pc sp
 # VIEW SOURCE ALONGSIDE DISASSEMBLY:            layout split
 # VIEW DISASSEMBLY ONLY:                        layout asm
 # VIEW RAM (ex: STACK, 16*h(2B) from $sp addr): x/16xh $sp
-dbg: all
-	echo ${GDB_CONFIG} > ${GDB_SCRIPT_PATH}
-	gdb -tui -x ${GDB_SCRIPT_PATH}
-
-# ==== CLEAN ================================================================= #
-clean:
-	rm ${BUILD_DIR_PATH}/*

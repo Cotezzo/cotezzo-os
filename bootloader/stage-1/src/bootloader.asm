@@ -3,7 +3,8 @@
 %define CR 0x0A
 %define DISK_ERROR_TEXT `Il tuo floppy fa un po' cagare`
 %define REBOOTING_TEXT `Reboot...`
-%define KERNEL_BIN `KERNEL  BIN`
+%define STAGE_2_BIN `STAGE-2 BIN`
+;%define STAGE_2_BIN `KERNEL  BIN`
 
 %define BOOT_MEM_OFFSET 0x7C00
 %define DATA_MEM_OFFSET 0x7C00 + 0x0200
@@ -230,7 +231,7 @@ main:
         test cx, cx                                 ; If first B is 0, we reached the last one: print error
         jz disk_error                               ; If not, check if it's our kernel
         
-        mov si, kernel_file_name                    ; Load kernel filename string address
+        mov si, stage_2_file_name                    ; Load kernel filename string address
         mov di, bx                                  ; Load current entry filename address
         mov cx, 11                                  ; Filename size (11 chars for FAT12)
         repe cmpsb                                  ; Check if filename matches kernel's
@@ -246,7 +247,7 @@ main:
     ; BX points to the correct root entry - lower cluster value is at 27th, 28th byte
     .kernel_found:
         mov bx, [bx + 26]
-        mov [current_cluster], bx                   ; Load word at 27th byte
+        mov [current_cluster], bx                   ; Load word at 27th byte - lower cluster
         
         mov ax, [bpb_reserved_sectors]              ; Read FAT, right after reserved sector
         mov cx, [bpb_sectors_per_fat]               ; Read whole FAT
@@ -260,14 +261,15 @@ main:
     mov bx, KERNEL_MEM_OFFSET                       ; the FAT table currently saved in RAM
     .load_kernel_cluster:
         ; Calculate current cluster sector
-        mov ax, [current_cluster]                   ; Prepare first mul operand
+        mov ax, [current_cluster];7d41              ; Prepare first mul operand
         sub ax, 2                                   ; Subtract 2 to cluster, skipping the first two FAT entries
-        mov cx, [bpb_sectors_per_cluster]           ; Prepare second mul operand
+        xor cx, cx                                  ; Clean CH since the whole CX is used (bug fixed using gdb)
+        mov cl, [bpb_sectors_per_cluster]           ; Prepare second mul operand
         mul cx
         add ax, [cluster_region_offset]             ; Retrieve cluster region start saved earlier
 
-        mov cx, [bpb_sectors_per_cluster]           ; Cluster size
-        mov dl, [ebp_drive]                         ; Select the drive to read from, BIOS already set it
+        mov cl, [bpb_sectors_per_cluster]           ; Cluster size
+        mov dl, [ebp_drive];7d55                    ; Select the drive to read from, BIOS already set it
         call disk_read                              ; Load cluster to memory
 
         ; Read next cluster from FAT
@@ -323,9 +325,9 @@ disk_error:                                         ; Don't care about pushing a
 ; ==== CONSTANT DATA DIRECTIVES ============================================================================== ;
 disk_error_text: db DISK_ERROR_TEXT, LF, CR
 rebooting_text: db REBOOTING_TEXT, LF, CR
-kernel_file_name: db KERNEL_BIN
-test: db `TEST`, LF, CR
+stage_2_file_name: db STAGE_2_BIN
 
+; ==== VARIABLE DATA DIRECTIVES ============================================================================== ;
 cluster_region_offset: dw 0
 current_cluster: dw 0
 
