@@ -19,7 +19,7 @@ TARGET_RELEASE_ELF=${TARGET_RELEASE_DIR}/${PROJECT_NAME}
 TARGET_BIN=${TARGET_DIR}/${PROJECT_NAME}.bin
 
 # ==== TARGET ================================================================ #
-# Don't threat these targets as files
+# Don't treat these targets as files
 .PHONY: all dev release clean bin elf
 
 # DEFAULT: build project if source has changed

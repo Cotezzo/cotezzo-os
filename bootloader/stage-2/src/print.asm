@@ -39,7 +39,7 @@ _print_char:
     ;! For some reason (probably being Rust not
     ;! fully supporting 16b mode or some errors
     ;! in the custom target), the u8 parameters
-    ;! pushed by Rust are threated as 32b values;
+    ;! pushed by Rust are treated as 32b values;
     ;! the stack pointer has to be moved by 4.
     mov al, [bp+6]  ; 1^ Rust param: to print char
     mov bh, [bp+10] ; 2^ Rust param: page number

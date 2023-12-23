@@ -31,7 +31,7 @@ GDB_CONFIG="\
 \nx/16xh 0x7dfe"
 
 # ==== TARGET ================================================================ #
-# Don't threat these targets as files
+# Don't treat these targets as files
 .PHONY: all clean run dbg
 
 # DEFAULT: always clean and create new target image

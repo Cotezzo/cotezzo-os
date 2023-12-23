@@ -1,5 +1,4 @@
-/**! Linker Script passed to the compiler, configured in .cargo/config.toml.
-  *! Not really useful for now, since the binary is stripped from the ELF.    */
+/**! Linker Script passed to the compiler, configured in .cargo/config.toml.  */
 
 /* Specify executable entry point (first section) */
 ENTRY(_start)

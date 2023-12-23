@@ -6,7 +6,7 @@ TARGET_DIR=./target
 TARGET_BIN=${TARGET_DIR}/stage-1.bin
 
 # ==== TARGET ================================================================ #
-# Don't threat these targets as files
+# Don't treat these targets as files
 .PHONY: all dev release clean
 
 # DEFAULT: build project if source has changed
