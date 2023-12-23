@@ -6,12 +6,15 @@ TARGET_DIR=./target
 TARGET_BIN=${TARGET_DIR}/stage-1.bin
 
 # ==== TARGET ================================================================ #
-# DEFAULT: build project if source has changed
-all: ${TARGET_BIN}
+# Don't threat these targets as files
+.PHONY: all dev release clean
 
-# DEV & RELEASE: always clean and extract binary
-dev: clean ${TARGET_BIN}
-release: clean ${TARGET_BIN}
+# DEFAULT: build project if source has changed
+all: dev
+
+# DEV & RELEASE: extract binary
+dev: ${TARGET_BIN}
+release: ${TARGET_BIN}
 
 # Create stage-1 bootloader binary from assembly source
 ${TARGET_BIN}: ${MAIN} ${TARGET_DIR}

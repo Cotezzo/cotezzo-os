@@ -214,7 +214,7 @@ main:
 
     ; ES segment already set
     mov dl, [ebp_drive]                             ; Select the drive to read from, BIOS already set it
-    mov bx, DATA_MEM_OFFSET                         ; Place data after the bootloader (0x0200 = 512b)
+    mov bx, DATA_MEM_OFFSET;7cf0                    ; Place data after the bootloader (0x0200 = 512b)
     call disk_read                                  ; Load Root Entries to memory
     ;! Instead of loading the whole root directory, one could load one sector at a time
     ;! Not really an issue for now since we have from 0x00007E00 to 0x0007FFFF "free" in real mode
@@ -277,10 +277,10 @@ main:
         xor dx, dx                                  ; Clear DX for division
         mov ax, [current_cluster]                   ; Prepare first mul operand
         mov cx, 3                                   ; Prepare second mul operand (can't use constants)
-        mul cx                                      ; AX = AX * CX
+        mul cx;7d67                                 ; AX = AX * CX
         mov cx, 2                                   ; Prepare second div operand
         div cx                                      ; AX = AX / CX - AX: result, DX: reminder
-        mov si, ax;7d66                             ; Can't use AX to access RAM, move FAT entry index to SI
+        mov si, AX                                  ; Can't use AX to access RAM, move FAT entry index to SI
         mov ax, [DATA_MEM_OFFSET + si]              ; Store next cluster in AX - FAT RAM location + index
 
         ; Adjust read bytes to match 12b data
@@ -300,12 +300,14 @@ main:
         jmp .load_kernel_cluster                    ; Load new current cluster
 
     .start_kernel:
+        cli;7d91                                    ; Disable interrupts when setting up segment registries
+        mov dl, [ebp_drive]                         ; Set drive number to DL for the stage-2 to read it
         mov ax, KERNEL_MEM_SEGMENT
         mov ds, ax                                  ; Setup data segment register for the kernel
         mov ss, ax                                  ; Setup stack segment register for the kernel
         mov es, ax                                  ; Setup extra segment register for the kernel
         mov sp, KERNEL_MEM_OFFSET                   ; Setup stack pointer register to kernel's start
-        jmp KERNEL_MEM_SEGMENT:KERNEL_MEM_OFFSET    ; Far jump to loaded kernel code
+        jmp KERNEL_MEM_SEGMENT:KERNEL_MEM_OFFSET;7da2; Far jump to loaded kernel code
 
     cli                                             ; Disable interrupts: CPU can't exit of halt state
     hlt                                             ; Stop executing

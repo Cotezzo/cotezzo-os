@@ -5,9 +5,18 @@
 ENTRY(_start)
 
 SECTIONS{
-    /* Place the .text section at the start of the output binary. */
+    /*  Place the .text._start section at the very start of the output binary,
+        followed by all the other .text sections. */
     . = 0x0;
-    .text : { *(.text*) }
+    .text : {
+      *(.text._start)
+      *(.text*)
+    }
+
+    /* Force the .rodata section after the start section. */
+    .rodata : {
+        *(.rodata .rodata.*)
+    }
 
     /* Remove ELF metadata from the output file. */
     /DISCARD/ : { *(.comment) }

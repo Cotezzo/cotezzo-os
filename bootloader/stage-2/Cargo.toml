@@ -1,13 +1,12 @@
+# Cargo Package Metadata
 [package]
 name = "stage-2"
 version = "0.1.0"
 edition = "2021"
 
-# By default, Rust uses unwinding to run the destructors of all live stack
-# variables in case of a panic. This ensures that all used memory is freed and
-# allows the parent thread to catch the panic and continue execution.
-# Unwinding, however, is a complicated process and requires some OS-specific
-# libraries, so we don’t want to use it for our operating system.
+# By default Rust runs destructors of all stack vars when panicking (unwinding).
+# This way, all used memory is freed and parent thread can continue execution.
+# Unwinding is complicated and requires OS-specific libs: we can't use it.
 # Rust provides an option to abort on panic instead.
 [profile.dev]
 panic = "abort"

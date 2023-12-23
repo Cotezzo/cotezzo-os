@@ -22,6 +22,14 @@ build-std-features = ["compiler-builtins-mem"]
 # To avoid specifying the --target option with our custom triple .json
 target = "i386-code16-stage-2.json"
 
-#! Not really useful for now, since the binary is stripped from the ELF anyway.
-#. Specify custom linker script for our binary
-#. rustflags = [ "-C", "link-arg=--script=./link.ld" ]
+rustflags = [
+    # Specify custom linker script for our binary
+    "-C", "link-arg=--script=./link.ld",
+
+    # Add the asm module to the linkerso that it can add it to the final binary.
+    # The asm.bin file is generated prior to the build via Makefile/build.rs.
+    # Rust references the defined global asm methods using 'extern "C"'.
+    "-C", "link-arg=target/asm.o"
+
+    #"-C", "link-args=-z stack-size=1500000"
+]

@@ -11,15 +11,10 @@
     no_main tells the compiler not to use the normal entry point chain. */
 #![no_main]
 
-use core::arch::asm;
-use core::panic::PanicInfo;
-
-/*  panic_handler defines the method that is invoked when a panic occurs.
-    In a no_std environment we need to define it ourselves. */
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
+/* ==== ENTRY POINT ========================================================= */
+/*  All the code written here is underneath the .text._start section.
+    The _start section is then placed above all else by the linker script. */
+    core::arch::global_asm!(".section .text._start");
 
 /*  A main doesn’t make sense without an underlying runtime that calls it.
     We are overwriting the os entry point with our own _start function.
@@ -32,12 +27,37 @@ fn panic(_info: &PanicInfo) -> ! {
     (https://en.wikipedia.org/wiki/X86_calling_conventions) */
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    unsafe { asm!(
-        "mov ah, 0x0E",
-        "mov bh, 0",
-        "mov al, 'a'",
-        "int 0x10"
-    ) };
+    // DS, SS, SS registries are set to 0x1000, SP is set to 0 by the stage-1.
+    // Since the Stack Pointer grows backwards, it will wrap around the segment.
+    // The stack will still override our code if we reach 64kB.
+    //! In this environment there are no "stack overflow" guards
+    
+    // Only works in --release...
+    print_string(b"Hello world!");
 
+    // Do nothing until the end of time
+    loop {}
+}
+
+/* ==== METHODS ============================================================= */
+/*  Reference a method not located in this Rust module, but search for it
+    link-time. In this case, this is a global method declared in print.asm.
+    Rust calls the method using the C calling convention (extern "C"). */
+    extern "C" { fn _print_char(char: u8, page: u8) -> (); }
+
+/* Print each character in the array (ASCII string) using the ASM method. */
+fn print_string(s: &[u8]) {
+    for c in s.iter() {
+        unsafe { _print_char(*c, 0); }
+    }
+}
+
+/* ==== PANIC HANDLER ======================================================= */
+use core::panic::PanicInfo;
+
+/*  panic_handler defines the method that is invoked when a panic occurs.
+    In a no_std environment we need to define it ourselves. */
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }

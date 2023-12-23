@@ -31,8 +31,11 @@ GDB_CONFIG="\
 \nx/16xh 0x7dfe"
 
 # ==== TARGET ================================================================ #
+# Don't threat these targets as files
+.PHONY: all clean run dbg
+
 # DEFAULT: always clean and create new target image
-all: clean ${TARGET_IMG}
+all: ${TARGET_IMG}
 
 # Create the .img file from bootloader and kernel binaries.
 # 'dd' performes file operations. Create an output file (of) from input file
@@ -46,18 +49,18 @@ all: clean ${TARGET_IMG}
 # be done without mounting the image using the mtools commands (such as mcopy).
 #! This would overwrite the FAT12 headers and break the file system!
 #! The bootloader itself contains a copy of these headers to keep the fs valid.
-${TARGET_IMG}: ${TARGET_STAGE_1_BIN} ${TARGET_STAGE_2_BIN} ${TARGET_DIR}
+${TARGET_IMG}: ${TARGET_DIR} stage-1 stage-2 #${TARGET_STAGE_1_BIN} ${TARGET_STAGE_2_BIN} 
 	dd if=/dev/zero of=${TARGET_IMG} bs=${BLOCK_SIZE} count=${BLOCK_COUNT}
 	mkfs.fat -F 12 ${TARGET_IMG} -n "PORK_OS"
 	dd if=${TARGET_STAGE_1_BIN} of=${TARGET_IMG} conv=notrunc
 	mcopy -i ${TARGET_IMG} ${TARGET_STAGE_2_BIN} "::stage-2.bin"
 
 # Create bootloader binary from assembly source.
-${TARGET_STAGE_1_BIN}:
+stage-1: #${TARGET_STAGE_1_BIN}:
 	make ${TARGET} -C ${STAGE_1_DIR}
 
 # Create kernel binary from assembly source.
-${TARGET_STAGE_2_BIN}:
+stage-2: #${TARGET_STAGE_2_BIN}:
 	make ${TARGET} -C ${STAGE_2_DIR}
 
 # Create target directory for the image
@@ -72,11 +75,11 @@ clean:
 
 # ==== RUN =================================================================== #
 # Build and run os with the defined QEMU command and options.
-run: ${TARGET_IMG}
+run: all ${TARGET_IMG}
 	${EMU}
 
 # Build and debug os with QEMU and GDB; load .gdb config and scripts.
-dbg: ${TARGET_IMG}
+dbg: all ${TARGET_IMG}
 	echo ${GDB_CONFIG} > ${GDB_SCRIPT_PATH}
 	gdb -tui -x ${GDB_SCRIPT_PATH}
 
