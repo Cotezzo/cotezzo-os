@@ -22,7 +22,7 @@ The main packages (apt) used are:
 - `nasm`: assembler for our x86 ISA
 - `qemu-system`: emulation software
 - `dosfstools` and `mtools`: filesystem utils
-- `cargo`: package manager, builder, compiler for Rust
+- `cargo`: package manager, builder, compiler for Rust (currently using cargo 1.76.0-nightly)
 
 ### Other useful tools
 - `GHex` (or any other hex editor): useful to study the "anatomy" of the finished image file and assert that the file system and files are in the expected state and location.
