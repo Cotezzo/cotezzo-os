@@ -17,6 +17,14 @@ SECTIONS{
         *(.rodata .rodata.*)
     }
 
+    /* Force the .eh_frame_hdr and .eh_frame section after the start section. */
+    .eh_frame : {
+        *(.eh_frame .eh_frame.*)
+    }
+    .eh_frame_hdr : {
+        *(.eh_frame_hdr .eh_frame_hdr.*)
+    }
+
     /* Remove ELF metadata from the output file. */
     /DISCARD/ : { *(.comment) }
 }

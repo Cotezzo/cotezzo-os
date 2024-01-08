@@ -27,9 +27,11 @@ rustflags = [
     "-C", "link-arg=--script=./link.ld",
 
     # Add the asm module to the linkerso that it can add it to the final binary.
-    # The asm.bin file is generated prior to the build via Makefile/build.rs.
+    # The *.o files are generated prior to the build via Makefile or build.rs.
     # Rust references the defined global asm methods using 'extern "C"'.
-    "-C", "link-arg=target/asm.o"
+    "-C", "link-arg=target/print.o",
+    "-C", "link-arg=target/disk.o",
+    "-C", "link-arg=target/test.o"
 
     #"-C", "link-args=-z stack-size=1500000"
 ]

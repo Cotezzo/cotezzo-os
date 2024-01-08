@@ -3,19 +3,24 @@
 PROJECT_NAME=stage-2
 CUSTOM_TRIPLE=i386-code16-stage-2
 
-# Define source Rust code location
-SRC_RS=./src/main.rs
-SRC_ASM=./src/print.asm
-
-# Define target folder and output ELFs location
+# Define base directories
+SRC_DIR=./src
 TARGET_DIR=./target
-TARGET_ASM_ELF=${TARGET_DIR}/asm.o
+
+# Define Rust source code location
+SRC_RS=${SRC_DIR}/main.rs
+
+# Define assembly source location - multiple files
+SRC_ASM = $(wildcard ${SRC_DIR}/*.asm)
+TARGET_ASM_ELF := $(patsubst ${SRC_DIR}/%.asm,$(TARGET_DIR)/%.o,$(SRC_ASM))
+
+# Define target folder and final output ELFs location
 TARGET_DEBUG_DIR=${TARGET_DIR}/${CUSTOM_TRIPLE}/debug
-TARGET_RELEASE_DIR=${TARGET_DIR}/${CUSTOM_TRIPLE}/release
 TARGET_DEBUG_ELF=${TARGET_DEBUG_DIR}/${PROJECT_NAME}
+TARGET_RELEASE_DIR=${TARGET_DIR}/${CUSTOM_TRIPLE}/release
 TARGET_RELEASE_ELF=${TARGET_RELEASE_DIR}/${PROJECT_NAME}
 
-# Define output binary location
+# Define final output stripped binary location
 TARGET_BIN=${TARGET_DIR}/${PROJECT_NAME}.bin
 
 # ==== TARGET ================================================================ #
@@ -43,9 +48,12 @@ ${TARGET_RELEASE_ELF}: ${SRC_RS} ${TARGET_DIR} ${TARGET_ASM_ELF}
 ${TARGET_DIR}:
 	mkdir -p ${TARGET_DIR}
 
-# Create asm binary from assembly source - it'll be linked with the rust module
-${TARGET_ASM_ELF}: ${SRC_ASM}
-	nasm ${SRC_ASM} -f elf32 -o ${TARGET_ASM_ELF}
+# Create binary from assembly source - it'll be linked with the rust module.
+# Since TARGET_ASM_ELF is a list of .o files, this target is called multiple
+# times with different file names.
+# $@ evaluates to the target name; $< evaluates to the leftmost requirement.
+$(TARGET_DIR)/%.o: ${SRC_DIR}/%.asm
+	nasm $< -f elf32 -o $@
 
 # Delete target and binary files
 clean:
@@ -59,4 +67,4 @@ bin: ${TARGET_RELEASE_ELF} ${TARGET_BIN}
 # Disassemble content, read .comment ELF generated metadata section (useless)
 elf: ${TARGET_RELEASE_ELF}
 	objdump ${TARGET_RELEASE_ELF} -D -m i386 -M intel | less
-	readelf -p .comment ${TARGET_RELEASE_ELF}
+#	readelf -p .comment ${TARGET_RELEASE_ELF}

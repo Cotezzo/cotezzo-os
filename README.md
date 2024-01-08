@@ -29,11 +29,19 @@ The main packages (apt) used are:
 - `gdb`: debugging software that can be used to watch the state of run instructions, CPU registers and memory step by step, in order to better understand machine code execution and find bugs.
 
 ### Makefile
+The root Makefile invokes all the Makefiles from the sub-projects
+(currently stage-1, stage-2, kernel) and creates a bootable disk image.
+
+To create a clean project build and run the output disk with qemu, using
+`make clean run TARGET=release` is recommended. Other supported targets are:
 - `make`, `make all` or  `make TARGET=all`: build the image with default target.
 - `make TARGET=dev`: build the image using the dev target for all the sub-projects.
 - `make TARGET=release`: build the image using the release target for all the sub-projects.
 - `make run`: build the image and run QEMU.
 - `make dbg`: build the image and run QEMU + GDB debugger.
+- `make clean`: deletes the project and sub-projects build directories. Necessary before a
+new build if linker scripts or assembly files used in the Rust modules have been modified,
+since cargo can't watch those file for us.
 
 All the assembler, emulation and debugging configurations are set in the Makefile.
 The output directory for binary and image files is the `target` directory.

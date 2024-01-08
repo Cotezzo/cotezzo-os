@@ -11,33 +11,37 @@ global _print_char
 section .text
 
 ; ==== METHODS =================================== ;
-; Method impementing CDECL (C calling convetion):
+;? CDECL (C calling convention):
 ; - Argument passed through stack from right to left
 ; - Caller removes parameters from stack
 ; - EAX ECX EDX: caller-saved; others: callee-saved
 ; - EAX stores returned value (int or pointer)
-;
-; Entering the method, assuming two input params,
-; the stack looks like this:
-; |  0x....  |  PC  |  P2  |  P1  | ...caller... |
+; Entering the method, the stack looks like this:
+; |  0x....  |  PC  |  P1  |  P2  | ...caller... |
 ;          sp --^
-;
 ; Before returning, the SP must be restored to this
-; state, oterwise the PC register would be "lost".
+; state, otherwise the PC register would be "lost".
+
+;* Prints a character to the terminal using TTY.
+;* Input parameters (from last pushed / left):
+;* - Character to be printed
+;* - Page number
+;* Output: none
+; This method implements the C calling convention.
 _print_char:
     push bp         ; Save previous BP state
     mov bp, sp      ; Store method stack "start"
                     ; Pushing stuff would change SP
     push bx         ; BX is not caller saved
 
-    ; After pushing BP & BX, the last input param
-    ; is at address BP plus:
+    ; After pushing BP, the last input param is at
+    ; address BP plus 6:
     ; - sizeof PC (2B, Pushed by call instruction)
     ; - sizeof BP (2B, pushed by us)
-    ; - sizeof BX (2B, pushed by us)
+    ; TODO: where are those other 2B coming from?
     ; Segment is not pushed, this is a near call.
     ;! For some reason (probably being Rust not
-    ;! fully supporting 16b mode or some errors
+    ;! supporting 16b mode or some misconfiguration
     ;! in the custom target), the u8 parameters
     ;! pushed by Rust are treated as 32b values;
     ;! the stack pointer has to be moved by 4.
