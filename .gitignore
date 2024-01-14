@@ -1,4 +1,2 @@
-build
 notes.md
 **/target
-bootloader/stage-2/src/main.rs.showcase
