@@ -13,3 +13,6 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
+
+# Specify target architecture (32-bit)
+#> [target.'cfg(target_arch = "x86")'.dependencies]

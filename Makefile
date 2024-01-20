@@ -18,7 +18,7 @@ BLOCK_COUNT=2880	# ~1.47MB
 
 # Define QEMU command; -fda is used to load .img file as a disk.
 # Intel Arch, 32bit (aka i386). ISA: x86-32, 32b version of x86 (16b).
-EMU=qemu-system-i386 -fda ${TARGET_IMG}# -nographic > output.txt
+EMU=qemu-system-i386 -fda ${TARGET_IMG} -d int,cpu_reset -no-reboot -D ${TARGET_DIR}/floppy.log # -nographic > output.txt
 
 # Define .gdb debug script file and content (\ \n for multiline support).
 GDB_SCRIPT_PATH=${TARGET_DIR}/debug-script.gdb

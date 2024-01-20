@@ -20,18 +20,19 @@ build-std-features = ["compiler-builtins-mem"]
 # ==== BUILD FLAGS =========================================================== #
 [build]
 # To avoid specifying the --target option with our custom triple .json
-target = "i386-code16-stage-2.json"
+target = "i686-code32-stage-2.json"
 
+#! Flags can be declared in the target.json file, they've been moved there
 rustflags = [
     # Specify custom linker script for our binary
-    "-C", "link-arg=--script=./link.ld",
+    #> "-C", "link-arg=--script=./link.ld",
 
     # Add the asm module to the linkerso that it can add it to the final binary.
     # The *.o files are generated prior to the build via Makefile or build.rs.
     # Rust references the defined global asm methods using 'extern "C"'.
-    "-C", "link-arg=target/print.o",
-    "-C", "link-arg=target/disk.o",
-    "-C", "link-arg=target/test.o"
+    #> "-C", "link-arg=target/main.o",
+    #> "-C", "link-arg=target/vga.o",
+    #> "-C", "link-arg=target/disk.o"
 
-    #"-C", "link-args=-z stack-size=1500000"
+    #> "-C", "link-args=-z stack-size=1500000"
 ]

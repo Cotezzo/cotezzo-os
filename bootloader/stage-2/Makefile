@@ -1,7 +1,7 @@
 # Define project name and custom triple (target) file for the compiler
 # The custom triple is defined as a .json file stored in repository root
 PROJECT_NAME=stage-2
-CUSTOM_TRIPLE=i386-code16-stage-2
+CUSTOM_TRIPLE=i686-code32-stage-2
 
 # Define base directories
 SRC_DIR=./src
@@ -11,8 +11,9 @@ TARGET_DIR=./target
 SRC_RS=${SRC_DIR}/main.rs
 
 # Define assembly source location - multiple files
-SRC_ASM = $(wildcard ${SRC_DIR}/*.asm)
-TARGET_ASM_ELF := $(patsubst ${SRC_DIR}/%.asm,$(TARGET_DIR)/%.o,$(SRC_ASM))
+SRC_ASM_DIR=${SRC_DIR}/asm
+SRC_ASM=$(wildcard ${SRC_ASM_DIR}/*.asm)
+TARGET_ASM_ELF := $(patsubst ${SRC_ASM_DIR}/%.asm,$(TARGET_DIR)/%.o,$(SRC_ASM))
 
 # Define target folder and final output ELFs location
 TARGET_DEBUG_DIR=${TARGET_DIR}/${CUSTOM_TRIPLE}/debug
@@ -52,7 +53,7 @@ ${TARGET_DIR}:
 # Since TARGET_ASM_ELF is a list of .o files, this target is called multiple
 # times with different file names.
 # $@ evaluates to the target name; $< evaluates to the leftmost requirement.
-$(TARGET_DIR)/%.o: ${SRC_DIR}/%.asm
+$(TARGET_DIR)/%.o: ${SRC_ASM_DIR}/%.asm
 	nasm $< -f elf32 -o $@
 
 # Delete target and binary files

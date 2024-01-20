@@ -16,72 +16,76 @@
 #![feature(panic_info_message)]
 
 /* ==== ENTRY POINT ========================================================= */
-/*  Import "lib_to_string.rs" methods and types (even if not explicitly
-    used: print_string is a macro and uses them in this scope).
-    TODO: uncomment once pointers are fixed
+mod vga;    // Use VGA module
+mod pmio;   // Make PMIO module visible to VGA module
+mod print;
 
-mod lib_print;
-
-use crate::lib_print::print_string;
-use crate::lib_print::ToString;
-
-mod lib_disk;
-use crate::lib_disk::_disk_reset;
-use crate::lib_disk::_disk_get_params;
-*/
+use print::ToString;
+use vga::{get_vga, Vga};
 
 /*  All the code written here is underneath the .text._start section.
     The _start section is then placed above all else by the linker script. */
-core::arch::global_asm!(".section .text._start");
+core::arch::global_asm!(".section .text.rs_start");
 
-/*  A main doesn’t make sense without an underlying runtime that calls it.
+/** A main doesn’t make sense without an underlying runtime that calls it.
     We are overwriting the os entry point with our own _start function.
     The no_mangle attribute ensures that the compiler outputs the
     function with name _start and not some cryptic unique name symbol.
-    Required since we need to tell the entry point name to the linker.
-    "_start" is the default entry point name for most systems.
     We also have to mark the function as extern "C" to tell the compiler that
     it should use the C calling convention for this function
     (https://en.wikipedia.org/wiki/X86_calling_conventions).
     
-    DS, SS, CS, ES registries are set to 0x1000, SP is set to 0 by stage-1.
-    Since the Stack Pointer grows backwards, it will wrap around the segment.
-    The stack will still override our code if we reach 64kB.
+    DS, SS, ES are set to 0x10, refers to 32pm data segment selector.
+    CS register is set to 0x08, refers to 32pm code segment selector.
+    SP is set to 0; Since the Stack Pointer grows backwards, it will wrap around the segment.
+    The stack will override our code if we reach it (flat mem model = 4GB...):
     In this environment there are no "stack overflow guards". */
 #[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
-    // To print character
-    let char: u8 = b'0';
+pub extern "C" fn _rs_start(drive_number: u32) -> ! {
+    let vga: &mut Vga = get_vga();
 
-    // First method to be called correctly prints '0' (original variable value);
-    // Second method DOES NOT, prints random character;
-    // This is true for both combinations (value_print first, pointer_print first).
-    _value_print_test(char, 0);
-    _pointer_print_test(&char as *const u8);
+    vga.clear();
+    vga.clear_cursor();
+    println!("Hello world from main.rs! Current disk: ", drive_number);
 
-    // Do nothing until the end of time
+    /*
+    let drive_type_out: u8 = 0;
+    let cylinders_out: u16 = 0;
+    let heads_out: u8 = 0;
+    let sectors_out: u8 = 0;
+    unsafe {
+        _disk_get_params(drive_number as u8, &drive_type_out, &cylinders_out, &heads_out, &sectors_out);
+        println!("Type: ", drive_type_out);
+        println!("Cylinders: ", cylinders_out);
+        println!("Heads: ", heads_out);
+        println!("Sectors: ", sectors_out);
+    }
+    */
+
+    // Do nothing until the end of time - 'never' (!) return type
     loop {}
 }
 
-// TODO: remove once pointers are fixed
 extern "C" {
-    fn _pointer_print_test(char: *const u8) -> ();
-    fn _value_print_test(char: u8, page: u8) -> ();
+    pub fn _disk_reset(drive: u8) -> bool;
+    pub fn _disk_read(drive: u8, cylinder: u16, head: u8, sector: u8, count: u8, address: *const u16) -> bool;
+    pub fn _disk_get_params(drive: u8, drive_type_out: *const u8, cylinders_out: *const u16, heads_out: *const u8, sectors_out: *const u8) -> bool;
 }
 
 /* ==== PANIC HANDLER ======================================================= */
-use core::panic::PanicInfo;
+use core::{panic::PanicInfo};
 
-/*  panic_handler defines the method that is invoked when a panic occurs.
+/** panic_handler defines the method that is invoked when a panic occurs.
     In a no_std environment we need to define it ourselves. */
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
 
-    /* Print panic reason
-    TODO: uncomment once pointers are fixed
-    print!(_info.message().unwrap().as_str().expect("Panic!"));
-    */
+    // Print panic reason
+    println!("\r\n", _info.message().unwrap().as_str().expect("Panic!"));
 
-    // Do nothing until the end of time
+    // Do nothing until the end of time - 'never' (!) return type
     loop {}
 }
+
+/* ==== TESTS =============================================================== */
+// TODO: custom framework for no_std testing

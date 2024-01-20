@@ -8,8 +8,8 @@
 
 %define BOOT_MEM_OFFSET 0x7C00
 %define DATA_MEM_OFFSET 0x7C00 + 0x0200
-%define KERNEL_MEM_SEGMENT 0x1000
-%define KERNEL_MEM_OFFSET 0
+%define KERNEL_MEM_SEGMENT 0x0
+%define KERNEL_MEM_OFFSET 0x0500
 
 ; ==== MEMORY AND ARCH DIRECTIVES ============================================================================ ;
 org BOOT_MEM_OFFSET                                 ; Bootloader loaded in 0x7C00 (32kB - 512b - 512b)
