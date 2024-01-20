@@ -46,13 +46,14 @@ _start:
     ; is equal to the address in the code segment
     ; selector, since it defines a flat memory
     ; model (base is 0).
-    jmp dword 0x08:.32pm
-    sti                                             ; Re-enable interrupts
+    jmp dword gdt.selector_32pm_cs - gdt:.32pm
 
     .32pm:
     [bits 32]
+    ;! Re-enabling interrupts eventually crashes
+    ;sti                                             ; Re-enable interrupts
 
-    push dword 0x1                       ; Push disk number
+    push dword [drive_number]                       ; Push disk number
     call _rs_start
     ;push dword 0xDEADBEEF                           ; Push fake EPC register so that our real parameter is read
     ;jmp dword gdt.selector_32pm_cs-gdt:_rs_start    ; Jump to 32-bit Rust block

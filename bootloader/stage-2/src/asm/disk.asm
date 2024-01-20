@@ -3,15 +3,79 @@
 ; Code to be used in a 32bp mode environment.
 bits 32
 
+; ==== REAL MODE / PROTECTED MODE MACROS ===================================================================== ;
+; Define macro name and number of parameters
+%macro from_32pm_to_16rm 0
+    cli                                             ; Disable interrupts for switching
+    push eax
+    
+    jmp word 0x18:.16pm                             ; Jump to 16b segment (word -> address size)
+
+    .16pm:
+    [bits 16]
+
+    mov eax, cr0                                    ; Read control register 0 value
+    and al, ~1                                      ; Unset first bit to switch back to real mode
+    mov cr0, eax                                    ; Update CR0 value
+
+    xor ax, ax                                      ; Setup segment registers to 0, GDT is not used now
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    jmp word 0x00:.16rm                             ; Setup CS register for real mode
+
+    .16rm:
+    pop eax
+    sti                                             ; Mode switch completed, re-enable interrupts
+%endmacro
+
+; Define macro name and number of parameters
+%macro from_16rm_to_32pm 0
+    cli                                             ; Disable interrupts for switching
+    push eax
+    
+    ; GDT descriptor already loaded
+
+    mov eax, cr0                                    ; Read control register 0 value
+    or al, 1                                        ; Set first bit (protected mode)
+    mov cr0, eax                                    ; Update CR0 value
+
+    jmp dword 0x08:.32pm                            ; Setup Code Segment selector
+
+    .32pm:
+    [bits 32]
+    mov ax, 0x10                                    ; Setup Data Segment selector
+    mov ds, ax
+    mov ss, ax
+    mov es, ax
+
+    pop eax
+    ;! Re-enabling interrupts eventually crashes
+    ;sti                                            ; Mode switch completed, re-enable interrupts
+%endmacro
+
 ; ==== GLOBALS AND EXTERN METHODS ============================================================================ ;
 ; Make the following methods visible to the linker.
 global _disk_reset
 global _disk_read
 global _disk_get_params
+global _test
 
 ; ==== CODE SECTION ========================================================================================== ;
 ; Define the following code in the .text section, so that we can control its location with linker script.
 section .text
+
+;>==================================================
+_test:
+    [bits 32]
+    from_32pm_to_16rm
+    mov ah, 0x0E
+    mov al, '?'
+    mov bh, 0
+    int 0x10
+    from_16rm_to_32pm
+    retn
+;>==================================================
 
 ;? CDECL (C calling convention):
 ; - Argument passed through stack from right to left
@@ -32,6 +96,7 @@ section .text
 ;* - Outcome of the operation (1 success, 0 error)
 ; This method implements the C calling convention.
 _disk_reset:
+    [bits 32]
     push ebp                                         ; Save previous BP state
     mov ebp, esp                                      ; Store method stack "start" - Pushing stuff would change SP
     ; No need to push DX, is caller saved
@@ -69,6 +134,7 @@ _disk_reset:
 ;* - Outcome of the operation (1 success, 0 error)
 ; This method implements the C calling convention.
 _disk_read:
+    [bits 32]
 
     ; Setup and save stack pointers
     push ebp
@@ -124,24 +190,28 @@ _disk_read:
 ;* - Outcome of the operation (1 success, 0 error)
 ; This method implements the C calling convention.
 _disk_get_params:
+    [bits 32]
+
     push ebp
     mov ebp, esp
-    push ebx                                         ; BX is not caller saved
-    push esi                                         ; SI is not caller saved
-    push edi                                         ; DI is not caller saved
+    push ebx                                        ; BX is not caller saved
+    push esi                                        ; SI is not caller saved
+    push edi                                        ; DI is not caller saved
     push es                                         ; ES is not caller saved
 
-    mov dl, [ebp+8]                                  ; 1^ Rust param: to read drive
+    mov dl, [ebp+8]                                 ; 1^ Rust param: to read drive
 
-    ; TODO: return to real mode
+    ; Return to real mode
+    from_32pm_to_16rm
 
-    ;stc                                             ; Reset CF to 1 to read the outcome of INT
-    ;mov di, 0                                       ; INT 13, 8 requires ES:DI to be 0000:0000
-    ;mov es, di
-    ;mov ah, 0x08                                    ; INT 13, 8: Read Disk Parameters
-    ;int 0x13
+    stc                                             ; Reset CF to 1 to read the outcome of INT
+    xor di, di                                      ; INT 13, 8 requires ES:DI to be 0000:0000
+    mov es, di
+    mov ah, 0x08                                    ; INT 13, 8: Read Disk Parameters
+    int 0x13
 
-    ; TODO: return to protected mode
+    ; Return to protected mode
+    from_16rm_to_32pm
 
     pop es
     pop edi
@@ -156,41 +226,35 @@ _disk_get_params:
     ; CH = low eight bits of maximum cylinder number
     ; CL = maximum sector number (5-0)
     ;      high two bits of cylinder number (7-6)
-    ; DH = maximum head number
+    ; DH = maximum head number (0 based)
     ; DL = number of drives
     ; ES:DI -> drive parameter table (floppies only)
 
-    ;*jc .exit                                        ; If CF is set, error: jump to end without preparing output
+    jc .exit                                        ; If CF is set, error: jump to end without preparing output
 
-    ; ==== TEST
-    ;mov si, [ebp+22]
-    ;mov al, [si]
-    ;add al, '0'
-    ;mov bh, 0
-    ;mov ah, 0x0E
-    ;int 0x10
-    ; ==== TEST
+    mov esi, [ebp+12]                               ; 2^ Rust param: drive type output address
+    mov byte [esi], bl
 
-    mov esi, [ebp+12]                                 ; 2^ Rust param: drive type output address
-    mov byte [esi], 0x1;bl
     mov bl, ch
     mov bh, cl
     shr bh, 6
-    mov esi, [ebp+16]                                 ; 3^ Rust param: cylinders count output address
-    mov word [esi], 0x2;bx
-    mov esi, [ebp+20]                                 ; 4^ Rust param: heads count output address
-    mov byte [esi], 0x3;dh
+    mov esi, [ebp+16]                               ; 3^ Rust param: cylinders count output address
+    mov word [esi], bx
+
+    inc dh                                          ; Heads number is 0 based, + 1 for real number
+    mov esi, [ebp+20]                               ; 4^ Rust param: heads count output address
+    mov byte [esi], dh
+
     and cl, 0x3F
-    mov esi, [ebp+24]                                 ; 5^ Rust param: sectors count output address
-    mov byte [esi], 0x4;cl
+    mov esi, [ebp+24]                               ; 5^ Rust param: sectors count output address
+    mov byte [esi], cl
 
     .exit:
-    mov eax, 1                                       ; AX is the return value, it should reflect INT CF state
-    sbb eax, 0                                       ; ax = ax - (0 + CF) (CF 0 -> AX 1, CF 1 -> AX 0)
+    mov eax, 1                                      ; AX is the return value, it should reflect INT CF state
+    sbb eax, 0                                      ; ax = ax - (0 + CF) (CF 0 -> AX 1, CF 1 -> AX 0)
 
     pop esi
     pop ebx
     mov esp, ebp
     pop ebp
-
     retn
