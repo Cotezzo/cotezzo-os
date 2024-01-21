@@ -44,8 +44,8 @@ macro_rules! println {
     for each type we need to print with the print! macro.
     The trait is implement by defining a to_string method that returns a
     reference to a static string. */
-pub trait ToString { fn to_string(&self) -> &'static [u8]; }
-pub trait ToStringBase { fn to_string_base(&self, base: u8) -> &'static [u8]; }
+pub trait ToString { fn to_string(&self) -> &[u8]; }
+pub trait ToStringBase { fn to_string_base(&self, base: u8) -> &[u8]; }
 
 /* ==== STATIC BUFFERS AND DIGITS =========================================== */
 /** List of possible digits for a number to print.
@@ -58,13 +58,13 @@ static mut BUFFER: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
 
 /* ==== TRAIT IMPLEMENTATION FOR STRINGS ==================================== */
 /*  Implement the ToString trait for the static &[u8] type: return self. */
-impl ToString for &'static [u8] {
-    fn to_string(&self) -> &'static [u8] { self }
+impl ToString for &[u8] {
+    fn to_string(&self) -> &[u8] { self }
 }
 
 /*  Implement the ToString trait for the static &str type: return bytes. */
-impl ToString for &'static str {
-    fn to_string(&self) -> &'static [u8] { self.as_bytes() }
+impl ToString for &str {
+    fn to_string(&self) -> &[u8] { self.as_bytes() }
 }
 
 /* ==== TRAIT IMPLEMENTATION FOR BOOLEANS =================================== */
@@ -88,7 +88,7 @@ macro_rules! to_string_impl_uint {
 
         // Start code implementing ToString trait for the matched uint type
         impl ToStringBase for $ty {
-            fn to_string_base(&self, base: u8) -> &'static [u8] {
+            fn to_string_base(&self, base: u8) -> &[u8] {
 
                 // Init buffer index to last position and mutable copy of number
                 let mut i: usize = BUFFER_SIZE - 1;
@@ -129,7 +129,7 @@ macro_rules! to_string_impl_uint {
         }
 
         impl ToString for $ty {
-            fn to_string(&self) -> &'static [u8] {
+            fn to_string(&self) -> &[u8] {
                 self.to_string_base(10)
             }
         }
@@ -173,7 +173,7 @@ macro_rules! to_string_impl_int {
 
         // Start code implementing ToString trait for the matched int type
         impl ToStringBase for $ty {
-            fn to_string_base(&self, base: u8) -> &'static [u8] {
+            fn to_string_base(&self, base: u8) -> &[u8] {
 
                 // Init buffer index to last position and mutable copy of number
                 let mut i: usize = BUFFER_SIZE - 1;
@@ -184,7 +184,46 @@ macro_rules! to_string_impl_int {
                 // If the base is not 10, we want to print the raw value, so
                 // we treat is as an unsigned int as well (es: 15u8 --> 0F).
                 if num >= 0 || base != 10 {
-                    return (num as $uty).to_string_base(base);
+                    // return (num as $uty).to_string_base(base);
+
+                    //>=========================================================
+                    // Init buffer index to last position and mutable copy of number
+                    let mut i: usize = BUFFER_SIZE - 1;
+                    let mut num: $uty = num as $uty;
+
+                    // If the base is not 10, we want to also print the leading 0s:
+                    // calculate maximum digits for the given base and subtract from
+                    // minimum index. Minimum index is then used in the loop to
+                    // keep adding 0s until the minimum number size is reached.
+                    // If the base is 10, minimum size is 0 and it is not used.
+                    let mut min_i = BUFFER_SIZE;
+                    if base != 10 {
+                        let mut max_value = <$uty>::MAX;
+                        while max_value > 0 {
+                            max_value /= base as $uty;
+                            min_i -= 1;
+                        }
+                    }
+
+                    loop {
+                        // Divide number/$base to get the reminder (rightmost digit)
+                        // and compute next number value (shift digits to right).
+                        // Casting the remainder is safe unless $base > usize::MAX
+                        // (or 16 actually, DIGITS won't support it)...
+                        unsafe { BUFFER[i] = DIGITS[(num % base as $uty) as usize]; }
+                        num /= base as $uty;
+
+                        // If there are no digits left to print, exit;
+                        // Else, update buffer index to previous position and loop
+                        if num == 0 && i <= min_i { break; }
+                        i -= 1;
+                    }
+
+                    // Return from ith to last buffered values
+                    return unsafe { &BUFFER[i..] }
+                    //>=========================================================
+
+
                 }
 
                 // If number is negative and radix is 10, convert to positive
@@ -217,7 +256,7 @@ macro_rules! to_string_impl_int {
         }
 
         impl ToString for $ty {
-            fn to_string(&self) -> &'static [u8] {
+            fn to_string(&self) -> &[u8] {
                 self.to_string_base(10)
             }
         }
@@ -256,14 +295,55 @@ macro_rules! to_string_impl_ptr {
     // Match ty: type for which we are implementing the to_string method.
     ($ty:ty) => {
         impl ToStringBase for $ty {
-            fn to_string_base(&self, base: u8) -> &'static [u8] {
-                (*self as usize).to_string_base(base)
+            fn to_string_base(&self, base: u8) -> &[u8] {
+                // (*self as usize).to_string_base(base)
+
+                //> ============================================================
+                // Init buffer index to last position and mutable copy of number
+                let mut i: usize = BUFFER_SIZE - 1;
+                let mut num: usize = *self as usize;
+
+                // If the base is not 10, we want to also print the leading 0s:
+                // calculate maximum digits for the given base and subtract from
+                // minimum index. Minimum index is then used in the loop to
+                // keep adding 0s until the minimum number size is reached.
+                // If the base is 10, minimum size is 0 and it is not used.
+                let mut min_i = BUFFER_SIZE;
+                if base != 10 {
+                    let mut max_value = usize::MAX;
+                    while max_value > 0 {
+                        max_value /= base as usize;
+                        min_i -= 1;
+                    }
+                }
+
+                loop {
+                    // Divide number/$base to get the reminder (rightmost digit)
+                    // and compute next number value (shift digits to right).
+                    // Casting the remainder is safe unless $base > usize::MAX
+                    // (or 16 actually, DIGITS won't support it)...
+                    unsafe { BUFFER[i] = DIGITS[(num % base as usize) as usize]; }
+                    num /= base as usize;
+
+                    // If there are no digits left to print, exit;
+                    // Else, update buffer index to previous position and loop
+                    if num == 0 && i <= min_i { break; }
+                    i -= 1;
+                }
+
+                // Return from ith to last buffered values
+                unsafe { &BUFFER[i..] }
+                //> ============================================================
             }
         }
 
         impl ToString for $ty {
-            fn to_string(&self) -> &'static [u8] {
-                (*self as usize).to_string()
+            fn to_string(&self) -> &[u8] {
+                //(*self as usize).to_string()
+
+                //> ============================================================
+                self.to_string_base(10)
+                //> ============================================================
             }
         }
     };

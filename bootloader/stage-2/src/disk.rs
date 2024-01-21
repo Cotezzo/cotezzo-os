@@ -2,9 +2,9 @@ use core::{mem::size_of, panic};
 
 
 extern "C" {
-    pub fn _disk_reset(drive: u8) -> bool;
-    pub fn _disk_read(drive: u8, cylinder: u16, head: u8, sector: u8, count: u8, address: *const u16) -> bool;
-    pub fn _disk_get_params(drive: u8, drive_type_out: *const u8, cylinders_out: *const u16, heads_out: *const u8, sectors_out: *const u8) -> bool;
+    pub fn _c_disk_reset(drive: u8) -> bool;
+    pub fn _c_disk_read(drive: u8, cylinder: u16, head: u8, sector: u8, count: u8, address: *const u16) -> bool;
+    pub fn _c_disk_get_params(drive: u8, drive_type_out: *const u8, cylinders_out: *const u16, heads_out: *const u8, sectors_out: *const u8) -> bool;
 }
 
 /* ==== STRUCTS ============================================================= */

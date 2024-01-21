@@ -5,6 +5,12 @@ bits 32
 
 ; ==== REAL MODE / PROTECTED MODE MACROS ===================================================================== ;
 ; Define macro name and number of parameters
+; These blocks cannot be declared in actual
+; methods since they deal with real/protected
+; modes and segments.
+
+;* Switches from 32pm to 16rm. Sets the segments
+;* value to 0, keeps offsets as-is.
 %macro from_32pm_to_16rm 0
     cli                                             ; Disable interrupts for switching
     push eax
@@ -29,7 +35,13 @@ bits 32
     sti                                             ; Mode switch completed, re-enable interrupts
 %endmacro
 
-; Define macro name and number of parameters
+;* Switches from 16rm to 32pm. Does not load GDT
+;* since it must be called after switching back to
+;* 16rm, not as the first time swithing.
+;* The segment selectors are hardcoded and refer to
+;* the selectors defined in main.asm.
+; TODO: find a way to make 'extern gdt' work
+; TODO:     and avoid hardcoding these values.
 %macro from_16rm_to_32pm 0
     cli                                             ; Disable interrupts for switching
     push eax
@@ -54,28 +66,33 @@ bits 32
     ;sti                                            ; Mode switch completed, re-enable interrupts
 %endmacro
 
+
+;* Procudes a segmented memory address from the
+;* given linear address.
+;* Input:
+;* - Linear Memory Address
+;* - Output Segment Register
+;* - Output offset register (32bit version)
+;* - Output offset register (16bit version)
+%macro linear_to_segmented 4
+    mov %3, %1                                      ; Store linear address in 32b register
+    shr %3, 4                                       ; Only keep top 16 bits
+    mov %2, %4                                      ; Store shifted addr (segment) in segment register
+    
+    mov %3, %1                                      ; Store linear address in 32b register
+    and %3, 0xF                                     ; Only keep low 4 bits - Offset is already in the right reg
+%endmacro
+
+
 ; ==== GLOBALS AND EXTERN METHODS ============================================================================ ;
 ; Make the following methods visible to the linker.
-global _disk_reset
-global _disk_read
-global _disk_get_params
-global _test
+global _c_disk_reset
+global _c_disk_read
+global _c_disk_get_params
 
 ; ==== CODE SECTION ========================================================================================== ;
 ; Define the following code in the .text section, so that we can control its location with linker script.
 section .text
-
-;>==================================================
-_test:
-    [bits 32]
-    from_32pm_to_16rm
-    mov ah, 0x0E
-    mov al, '?'
-    mov bh, 0
-    int 0x10
-    from_16rm_to_32pm
-    retn
-;>==================================================
 
 ;? CDECL (C calling convention):
 ; - Argument passed through stack from right to left
@@ -95,7 +112,7 @@ _test:
 ;* Output:
 ;* - Outcome of the operation (1 success, 0 error)
 ; This method implements the C calling convention.
-_disk_reset:
+_c_disk_reset:
     [bits 32]
     push ebp                                         ; Save previous BP state
     mov ebp, esp                                      ; Store method stack "start" - Pushing stuff would change SP
@@ -108,12 +125,18 @@ _disk_reset:
     ; Segment is not pushed, this is a near call.
     mov dl, [ebp+8]                                  ; 1^ Rust param: to reset drive
 
+    ; Return to real mode
+    from_32pm_to_16rm
+
     stc                                             ; Reset CF to 1 to read the outcome of INT
     mov ah, 0x00                                    ; INT 13, 0: Reset Disk Controller
     int 0x13
 
-    mov ax, 1                                       ; AX is the return value, it should reflect INT CF state
-    sbb ax, 0                                       ; ax = ax - (0 + CF) (CF 0 -> AX 1, CF 1 -> AX 0)
+    ; Return to protected mode
+    from_16rm_to_32pm
+
+    mov eax, 1                                       ; AX is the return value, it should reflect INT CF state
+    sbb eax, 0                                       ; ax = ax - (0 + CF) (CF 0 -> AX 1, CF 1 -> AX 0)
 
     mov esp, ebp                                      ; Restore SP
     pop ebp                                          ; Restore BP
@@ -133,13 +156,13 @@ _disk_reset:
 ;* Output:
 ;* - Outcome of the operation (1 success, 0 error)
 ; This method implements the C calling convention.
-_disk_read:
+_c_disk_read:
     [bits 32]
 
     ; Setup and save stack pointers
     push ebp
     mov ebp, esp
-    push bx                                         ; BX is not caller saved
+    push ebx                                        ; BX is not caller saved
     push es                                         ; ES is not caller saved
 
     ; Parameters read and setup
@@ -155,23 +178,31 @@ _disk_read:
                                                     ; Cylinder  = 76543210 98
                                                     ; Sector    =            543210
 
-    mov al, [ebp+24]                                 ; 5^ Rust param: sectors to read, already set up for INT
-    mov bx, [ebp+28]                                 ; 6^ Rust param: loading address, already set up for INT
-    mov es, bx                                      ; Far pointer, segment and offset are both pushed
-    mov bx, [ebp+32]
+    mov al, [ebp+24]                                ; 5^ Rust param: sectors to read, already set up for INT
+    
+    ;mov bx, [ebp+28]                               ; 6^ Rust param: loading address, already set up for INT
+    ;mov es, bx                                     ; Far pointer, segment and offset are both pushed
+    ;mov bx, [ebp+32]
 
-
-    ; Interrupt call
+    ; Return to real mode
+    from_32pm_to_16rm
+    
+    linear_to_segmented [ebp+28], es, ebx, bx       ; 6^ Rust param: loading address, already set up for INT
+                                                    ; Convert linear address to segmented memory model address
+    ;> mov byte [es:bx], 'c'                        ; TEST: put something at pointed memory
     stc                                             ; Reset CF to 1 to read the outcome of INT
     mov ah, 0x02
     int 0x13                                        ; INT 13, 2: Read Disk Sectors
 
-    mov ax, 1                                       ; AX is the return value, it should reflect INT CF state
-    sbb ax, 0                                       ; ax = ax - (0 + CF) (CF 0 -> AX 1, CF 1 -> AX 0)
+    ; Return to protected mode
+    from_16rm_to_32pm
+
+    mov eax, 1                                       ; AX is the return value, it should reflect INT CF state
+    sbb eax, 0                                       ; ax = ax - (0 + CF) (CF 0 -> AX 1, CF 1 -> AX 0)
     
     ; Restore registers and return
     pop es
-    pop bx
+    pop ebx
     mov esp, ebp
     pop ebp
     retn
@@ -189,7 +220,7 @@ _disk_read:
 ;* Output:
 ;* - Outcome of the operation (1 success, 0 error)
 ; This method implements the C calling convention.
-_disk_get_params:
+_c_disk_get_params:
     [bits 32]
 
     push ebp
@@ -238,6 +269,7 @@ _disk_get_params:
     mov bl, ch
     mov bh, cl
     shr bh, 6
+    inc bx                                          ; Cyinders number is 0 based, + 1 for real number
     mov esi, [ebp+16]                               ; 3^ Rust param: cylinders count output address
     mov word [esi], bx
 
