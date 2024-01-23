@@ -24,6 +24,7 @@ mod fs;
 use fs::FS;
 use print::ToString;
 use vga::{get_vga, Vga};
+use core::arch::asm;
 
 /*  All the code written here is underneath the .text.rs_start section.
     The _start section is then placed above all else by the linker script. */
@@ -40,6 +41,9 @@ use vga::{get_vga, Vga};
     DS, SS, ES are set to 0x10, refers to 32pm data segment selector.
     CS register is set to 0x08, refers to 32pm code segment selector.
     SP is set to 0; since it grows backwards, it will wrap around the segment.
+//! RAM size for this device is 128MB (134_217_728 or 0x800_0000 byte).
+//! "Wrapping around" doesn't work: 0xFFFFFFFF isn't always a valid memory address.
+//! ESP is instead set to 0xFFFF. Read main.asm for more details.
     The stack will override our code if we reach it (flat mem model = 4GB...):
     in this environment there are no "stack overflow guards". */
 #[no_mangle]
@@ -52,7 +56,7 @@ pub extern "C" fn _rs_start(drive_number: u32) -> ! {
 
     // Stage-2 started, say hi
     println!("Hello world from main.rs! Current disk: ", drive_number);
-    
+
     // Initialize Fat12 "driver"
     let fat12: FS = FS::new(drive_number as u8);
     
@@ -80,6 +84,8 @@ impl Slice for [u8;512] {
 
 /* ==== PANIC HANDLER ======================================================= */
 use core::{panic::PanicInfo};
+
+use crate::print::ToStringBase;
 
 /** "panic_handler" defines the method that is invoked when a panic occurs.
     In a no_std environment we need to define it ourselves. */

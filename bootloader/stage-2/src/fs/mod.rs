@@ -92,13 +92,13 @@ impl FS {
         // Call BIOS to load FAT into memory at [&fat].
         // If the BIOS can't read from disk, return None.
         //*let fat: Fat = unsafe { core::mem::zeroed() };
-        let fat: [u8; 0] = [0; 0];  // TODO
+        let fat: [u8; 512*9] = [0; 512*9];  // TODO: optimise this
         let addr: *const u8 = &fat as *const u8;
 
         //> Debug logs
         println!("CHS: ", cylinder, " - ", head, " - ", sector, "\r\nCount: ", count, "\r\nAddr: ", (addr as usize + fat.len()).to_string_base(16));
 
-        //let outcome: bool = unsafe { _c_disk_read(drive_number as u8, cylinder, head, sector, count, addr) };
+        let outcome: bool = unsafe { _c_disk_read(drive_number as u8, cylinder, head, sector, count, addr) };
         if !outcome { panic!("Could not read FAT!"); }
 
 

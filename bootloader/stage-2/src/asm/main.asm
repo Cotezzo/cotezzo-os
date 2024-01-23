@@ -53,6 +53,15 @@ _start:
     ;! Re-enabling interrupts eventually crashes
     ;sti                                             ; Re-enable interrupts
 
+    ; RAM size for this device is 128MB (134_217_728 or 0x800_0000 byte)
+    ;!"Wrapping around" doesn't really work: 0xFFFFFFFF isn't always a valid memory address (such as here)
+    ; TODO: dynamically get the maximum addressable memory value and use that as ESP before running _rs_start
+    ;>mov esp, 0x8000000
+
+    ;! Setting ESP to a value > 0xFFFF is not possible here, since we occasionally return to real mode to call
+    ;! BIOS interrupts for disk I/O operations. For now, use maximum real mode address, 0xFFFF.
+    mov esp, 0xFFFF
+
     push dword [drive_number]                       ; Push disk number
     call _rs_start
     ;push dword 0xDEADBEEF                           ; Push fake EPC register so that our real parameter is read

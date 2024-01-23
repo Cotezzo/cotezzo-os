@@ -4,12 +4,11 @@
 %define DISK_ERROR_TEXT `Il tuo floppy fa un po' cagare`
 %define REBOOTING_TEXT `Reboot...`
 %define STAGE_2_BIN `STAGE-2 BIN`
-;%define STAGE_2_BIN `KERNEL  BIN`
 
 %define BOOT_MEM_OFFSET 0x7C00
 %define DATA_MEM_OFFSET 0x7C00 + 0x0200
-%define KERNEL_MEM_SEGMENT 0x0
-%define KERNEL_MEM_OFFSET 0x0500
+%define STAGE_2_MEM_SEGMENT 0x0
+%define STAGE_2_MEM_OFFSET 0x0500
 
 ; ==== MEMORY AND ARCH DIRECTIVES ============================================================================ ;
 org BOOT_MEM_OFFSET                                 ; Bootloader loaded in 0x7C00 (32kB - 512b - 512b)
@@ -229,13 +228,13 @@ main:
     .read_root_entries:
         mov cx, [bx]                                ; Entry starts with file name, load first byte
         test cx, cx                                 ; If first B is 0, we reached the last one: print error
-        jz disk_error                               ; If not, check if it's our kernel
+        jz disk_error                               ; If not, check if it's our stage-2
         
-        mov si, stage_2_file_name                    ; Load kernel filename string address
+        mov si, stage_2_file_name                   ; Load stage-2 filename string address
         mov di, bx                                  ; Load current entry filename address
         mov cx, 11                                  ; Filename size (11 chars for FAT12)
-        repe cmpsb                                  ; Check if filename matches kernel's
-        jz .kernel_found                            ; If it matches, load clusters, if not, go on
+        repe cmpsb                                  ; Check if filename matches stage-2's
+        jz .stage_2_found                           ; If it matches, load clusters, if not, go on
 
         inc ax                                      ; Increment counter
         add bx, 32                                  ; Increment address to next entry (entry = 32B)
@@ -245,7 +244,7 @@ main:
 
     ; ==== LOAD FAT ============================== ;
     ; BX points to the correct root entry - lower cluster value is at 27th, 28th byte
-    .kernel_found:
+    .stage_2_found:
         mov bx, [bx + 26]
         mov [current_cluster], bx                   ; Load word at 27th byte - lower cluster
         
@@ -255,11 +254,11 @@ main:
         mov bx, DATA_MEM_OFFSET                     ; Place data after the bootloader (override root entries)
         call disk_read                              ; Load first FAT to memory
     
-    ; ==== LOAD KERNEL BINARY ==================== ;
-    mov bx, KERNEL_MEM_SEGMENT                      ; Place Kernel at the designated memory area
+    ; ==== LOAD STAGE-2 BINARY =================== ;
+    mov bx, STAGE_2_MEM_SEGMENT                     ; Place stage-2 at the designated memory area
     mov es, bx                                      ; Load to 0x10000 in order to leave room for
-    mov bx, KERNEL_MEM_OFFSET                       ; the FAT table currently saved in RAM
-    .load_kernel_cluster:
+    mov bx, STAGE_2_MEM_OFFSET                      ; the FAT table currently saved in RAM
+    .load_stage_2_cluster:
         ; Calculate current cluster sector
         mov ax, [current_cluster];7d41              ; Prepare first mul operand
         sub ax, 2                                   ; Subtract 2 to cluster, skipping the first two FAT entries
@@ -291,23 +290,23 @@ main:
         and ax, 0x0FFF                              ; No need to "avoid" doing it if it's 1
 
         cmp ax, 0x0FF8                              ; If the next cluster is >= FF8, this was the last cluster:
-        jae .start_kernel                           ; jump to kernel startup
+        jae .start_stage_2                          ; jump to stage-2 startup
 
         mov [current_cluster], ax                   ; Setup current cluster for next iteration
         mov ax, [bpb_bytes_per_sector]              ; Prepare first mul operand
         mul word [bpb_sectors_per_cluster]          ; Calculate cluster size
         add bx, ax                                  ; Save next cluster after the previous to avoid overrides
-        jmp .load_kernel_cluster                    ; Load new current cluster
+        jmp .load_stage_2_cluster                   ; Load new current cluster
 
-    .start_kernel:
+    .start_stage_2:
         cli;7d91                                    ; Disable interrupts when setting up segment registries
         mov dl, [ebp_drive]                         ; Set drive number to DL for the stage-2 to read it
-        mov ax, KERNEL_MEM_SEGMENT
-        mov ds, ax                                  ; Setup data segment register for the kernel
-        mov ss, ax                                  ; Setup stack segment register for the kernel
-        mov es, ax                                  ; Setup extra segment register for the kernel
-        mov sp, KERNEL_MEM_OFFSET                   ; Setup stack pointer register to kernel's start
-        jmp KERNEL_MEM_SEGMENT:KERNEL_MEM_OFFSET;7da2; Far jump to loaded kernel code
+        mov ax, STAGE_2_MEM_SEGMENT
+        mov ds, ax                                  ; Setup data segment register for the stage-2
+        mov ss, ax                                  ; Setup stack segment register for the stage-2
+        mov es, ax                                  ; Setup extra segment register for the stage-2
+        mov sp, STAGE_2_MEM_OFFSET                   ; Setup stack pointer register to stage-2's start
+        jmp STAGE_2_MEM_SEGMENT:STAGE_2_MEM_OFFSET;7da2; Far jump to loaded stage-2 code
 
     cli                                             ; Disable interrupts: CPU can't exit of halt state
     hlt                                             ; Stop executing
