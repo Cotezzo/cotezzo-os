@@ -26,6 +26,8 @@ SECTIONS{
     .eh_frame :     { *(.eh_frame .eh_frame.*)          }
     .eh_frame_hdr : { *(.eh_frame_hdr .eh_frame_hdr.*)  }
 
+    .bss :          { *(.bss)                           }
+
     /* Remove ELF metadata from the output file. */
     /DISCARD/ :     { *(.comment)                       }
 }

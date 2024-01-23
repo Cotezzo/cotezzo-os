@@ -32,7 +32,7 @@ bits 32
 
     .16rm:
     pop eax
-    sti                                             ; Mode switch completed, re-enable interrupts
+    ;sti                                             ; Mode switch completed, re-enable interrupts
 %endmacro
 
 ;* Switches from 16rm to 32pm. Does not load GDT
@@ -123,7 +123,7 @@ _c_disk_reset:
     ; - sizeof EPC (4B, pushed by call instruction)
     ; - sizeof EBP (4B, pushed by us)
     ; Segment is not pushed, this is a near call.
-    mov dl, [ebp+8]                                  ; 1^ Rust param: to reset drive
+    mov dl, [ebp+8]                                 ; 1^ Rust param: to reset drive
 
     ; Return to real mode
     from_32pm_to_16rm
@@ -179,10 +179,6 @@ _c_disk_read:
                                                     ; Sector    =            543210
 
     mov al, [ebp+24]                                ; 5^ Rust param: sectors to read, already set up for INT
-    
-    ;mov bx, [ebp+28]                               ; 6^ Rust param: loading address, already set up for INT
-    ;mov es, bx                                     ; Far pointer, segment and offset are both pushed
-    ;mov bx, [ebp+32]
 
     ; Return to real mode
     from_32pm_to_16rm

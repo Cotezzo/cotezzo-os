@@ -4,7 +4,7 @@ use core::arch::asm;
 #[allow(dead_code)]
 /** Enum defining the Port Mapped I/O memory addresses of each (used) port.
  *  These addresses doesn't refer to the RAM, but to a dedicated port memory. */
- pub enum PortMappedAddr {
+pub enum PortMappedAddr {
     // ...
     VgaRegisterIndexW1 = 0x3C4,
     VgaRegisterIndexRW1,    // Previous +1
