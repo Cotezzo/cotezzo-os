@@ -43,6 +43,3 @@ main:
 
 ; ==== CONSTANT DATA DIRECTIVES ================================================================== ;
 start_text: db START_TEXT, LF, CR
-
-; ==== PADDING AND SIGNATURE ================================================================================= ;
-times 1024-($-$$) db 0                              ; Padding until 1024B to test bootloader cluster loading

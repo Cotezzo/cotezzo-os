@@ -30,42 +30,36 @@ _start:
     mov cr0, eax                                    ; Update CR0 value
 
     ; From here onwards, segments refer to GDT
-
     ; Setup Data Segment selector
-    mov ax, 0x10
+    mov ax, gdt.selector_32pm_ds - gdt
     mov ds, ax
     mov ss, ax
     mov es, ax
 
     ; Setup Code Segment selector
-    ; This works without other address value
-    ; manipulation since the stage-2 (this code)
-    ; is loaded with segments set to 0x0 and at
-    ; offset 0x500. This way, the segmented offset
-    ; is equal to the physical offset, which itself
-    ; is equal to the address in the code segment
-    ; selector, since it defines a flat memory
-    ; model (base is 0).
+    ; Stage-2 (this code) is loaded with segments set to 0x0 and with offset 0x500. This way, the segmented
+    ; offset is equal to the physical offset, which itself is equal to the address in the code segment
+    ; selector, since the latter defines a flat memory model (base is 0).
+    ; This way, there is no need to manipulate the address:
+    ; for example, if using segment 0x1000 and offset 0x0, the physical address would be 0x10000.
+    ; You would need to jump at the "real" address of .32pm label (0x10030 instead of 0x1000:0x30, for example).
+    ; This manipulation is quite challenging and I couldn't solve it, so I opted for 0x0:0x500 instead.
     jmp dword gdt.selector_32pm_cs - gdt:.32pm
 
     .32pm:
     [bits 32]
-    ;! Re-enabling interrupts eventually crashes
-    ;sti                                             ; Re-enable interrupts
+    sti                                             ; Re-enable interrupts
 
-    ; RAM size for this device is 128MB (134_217_728 or 0x800_0000 byte)
-    ;!"Wrapping around" doesn't really work: 0xFFFFFFFF isn't always a valid memory address (such as here)
-    ; TODO: dynamically get the maximum addressable memory value and use that as ESP before running _rs_start
-    ;>mov esp, 0x8000000
-
-    ;! Setting ESP to a value > 0xFFFF is not possible here, since we occasionally return to real mode to call
-    ;! BIOS interrupts for disk I/O operations. For now, use maximum real mode address, 0xFFFF.
-    mov esp, 0xFFFF
-
-    push dword [drive_number]                       ; Push disk number
-    call _rs_start
-    ;push dword 0xDEADBEEF                           ; Push fake EPC register so that our real parameter is read
-    ;jmp dword gdt.selector_32pm_cs-gdt:_rs_start    ; Jump to 32-bit Rust block
+    ;!"Wrapping around" (in 32bit) doesn't always work: 0xFFFFFFFF isn't always a valid memory address.
+    ; TODO: dynamically set to ESP the maximum RAM address before calling _rs_start.
+    ;! Setting ESP to a value > 0xFFFF is not possible here, since we occasionally return to real mode to
+    ;! call BIOS interrupts for disk I/O operations. Keep value set by stage-1, ~0xFFFF.
+    ;mov esp, 0x800_0000                            ; RAM size here is 128MB (134_217_728 or 0x800_0000 byte)
+    
+    push dword [drive_number]                       ; Push disk number as first _rs_start parameter
+    call _rs_start                                  ; Call _rs_start method declared in Rust and linked
+    ;//push dword 0xDEADBEEF                        ; Push fake EPC register so that our real parameter is read
+    ;//jmp dword gdt.selector_32pm_cs-gdt:_rs_start ; Jump to 32-bit Rust block
 
 
 ; ==== METHODS =============================================================================================== ;

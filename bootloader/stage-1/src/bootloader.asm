@@ -9,6 +9,7 @@
 %define DATA_MEM_OFFSET 0x7C00 + 0x0200
 %define STAGE_2_MEM_SEGMENT 0x0
 %define STAGE_2_MEM_OFFSET 0x0500
+%define STAGE_2_STACK_POINTER_START 0xFFFF
 
 ; ==== MEMORY AND ARCH DIRECTIVES ============================================================================ ;
 org BOOT_MEM_OFFSET                                 ; Bootloader loaded in 0x7C00 (32kB - 512b - 512b)
@@ -305,8 +306,11 @@ main:
         mov ds, ax                                  ; Setup data segment register for the stage-2
         mov ss, ax                                  ; Setup stack segment register for the stage-2
         mov es, ax                                  ; Setup extra segment register for the stage-2
-        mov sp, STAGE_2_MEM_OFFSET                   ; Setup stack pointer register to stage-2's start
-        jmp STAGE_2_MEM_SEGMENT:STAGE_2_MEM_OFFSET;7da2; Far jump to loaded stage-2 code
+
+        ; Setup stack pointer to maximum real memory address before jumping to stage-2
+        ; For more informations about stage-2 SP/ESP, see main.asm
+        mov sp, STAGE_2_STACK_POINTER_START
+        jmp STAGE_2_MEM_SEGMENT:STAGE_2_MEM_OFFSET  ; Far jump to loaded stage-2 code - 7da2
 
     cli                                             ; Disable interrupts: CPU can't exit of halt state
     hlt                                             ; Stop executing

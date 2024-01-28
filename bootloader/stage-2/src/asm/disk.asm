@@ -32,7 +32,7 @@ bits 32
 
     .16rm:
     pop eax
-    ;sti                                             ; Mode switch completed, re-enable interrupts
+    sti                                             ; Mode switch completed, re-enable interrupts
 %endmacro
 
 ;* Switches from 16rm to 32pm. Does not load GDT
@@ -46,7 +46,7 @@ bits 32
     cli                                             ; Disable interrupts for switching
     push eax
     
-    ; GDT descriptor already loaded
+    ; GDT descriptor already loaded by _entry
 
     mov eax, cr0                                    ; Read control register 0 value
     or al, 1                                        ; Set first bit (protected mode)
@@ -62,6 +62,7 @@ bits 32
     mov es, ax
 
     pop eax
+
     ;! Re-enabling interrupts eventually crashes
     ;sti                                            ; Mode switch completed, re-enable interrupts
 %endmacro

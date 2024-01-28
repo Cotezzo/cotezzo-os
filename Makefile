@@ -4,8 +4,10 @@ TARGET?=all
 # Define bootloader stages target binary location
 STAGE_1_DIR=./bootloader/stage-1
 STAGE_2_DIR=./bootloader/stage-2
+KERNEL_DIR=./kernel
 TARGET_STAGE_1_BIN=${STAGE_1_DIR}/target/stage-1.bin
 TARGET_STAGE_2_BIN=${STAGE_2_DIR}/target/stage-2.bin
+TARGET_KERNEL_BIN=${KERNEL_DIR}/target/kernel.bin
 
 # Define output image location
 TARGET_DIR=./target
@@ -32,7 +34,9 @@ GDB_CONFIG="\
 
 # ==== TARGET ================================================================ #
 # Don't treat these targets as files
-.PHONY: all clean run dbg
+#! If "kernel" is not in PHONY, the target won't run because the dependancy is
+#! already satisfied: there actually is a directory called "kernel".
+.PHONY: all clean run dbg stage-1 stage-2 kernel
 
 # DEFAULT: always clean and create new target image
 all: ${TARGET_IMG}
@@ -49,19 +53,24 @@ all: ${TARGET_IMG}
 # be done without mounting the image using the mtools commands (such as mcopy).
 #! This would overwrite the FAT12 headers and break the file system!
 #! The bootloader itself contains a copy of these headers to keep the fs valid.
-${TARGET_IMG}: ${TARGET_DIR} stage-1 stage-2 #${TARGET_STAGE_1_BIN} ${TARGET_STAGE_2_BIN} 
+${TARGET_IMG}: ${TARGET_DIR} stage-1 stage-2 kernel
 	dd if=/dev/zero of=${TARGET_IMG} bs=${BLOCK_SIZE} count=${BLOCK_COUNT}
 	mkfs.fat -F 12 ${TARGET_IMG} -n "PORK_OS"
 	dd if=${TARGET_STAGE_1_BIN} of=${TARGET_IMG} conv=notrunc
 	mcopy -i ${TARGET_IMG} ${TARGET_STAGE_2_BIN} "::stage-2.bin"
+	mcopy -i ${TARGET_IMG} ${TARGET_KERNEL_BIN} "::kernel.bin"
 
-# Create bootloader binary from assembly source.
+# Create stage-1 bootloader binary from assembly source.
 stage-1: #${TARGET_STAGE_1_BIN}:
 	make ${TARGET} -C ${STAGE_1_DIR}
 
-# Create kernel binary from assembly source.
+# Create stage-2 bootloader binary from assembly source.
 stage-2: #${TARGET_STAGE_2_BIN}:
 	make ${TARGET} -C ${STAGE_2_DIR}
+
+# Create kernel binary from assembly source.
+kernel:
+	make ${TARGET} -C ${KERNEL_DIR}
 
 # Create target directory for the image
 ${TARGET_DIR}:
@@ -72,14 +81,15 @@ clean:
 	rm -rf ${TARGET_DIR}
 	make clean -C ${STAGE_1_DIR}
 	make clean -C ${STAGE_2_DIR}
+	make clean -C ${KERNEL_DIR}
 
 # ==== RUN =================================================================== #
 # Build and run os with the defined QEMU command and options.
-run: all ${TARGET_IMG}
+run: all
 	${EMU}
 
 # Build and debug os with QEMU and GDB; load .gdb config and scripts.
-dbg: all ${TARGET_IMG}
+dbg: all
 	echo ${GDB_CONFIG} > ${GDB_SCRIPT_PATH}
 	gdb -tui -x ${GDB_SCRIPT_PATH}
 
