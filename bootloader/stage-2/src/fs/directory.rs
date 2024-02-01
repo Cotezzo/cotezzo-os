@@ -1,5 +1,6 @@
 /* ==== TYPE DEFINITION ===================================================== */
 #[repr(C, packed)]
+#[derive(Clone)]
 pub struct DirectoryEntry {
     pub name: [u8; 11],
     pub attributes: u8,             // READ_ONLY=0x01 HIDDEN=0x02 SYSTEM=0x04 VOLUME_ID=0x08 DIRECTORY=0x10 ARCHIVE=0x20 LFN=READ_ONLY|HIDDEN|SYSTEM|VOLUME_ID (LFN means that this entry is a long file name entry)

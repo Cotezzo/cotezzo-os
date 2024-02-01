@@ -27,6 +27,9 @@ mod pmio;   // Make PMIO module visible to VGA module
 mod prints;
 mod fs;
 
+/* ==== CONSTANTS =========================================================== */
+const KERNEL_FILE: &[u8] = b"KERNEL  BIN";//"STAGE-2 BIN";
+
 /* ==== ENTRY POINT ========================================================= */
 /*  All the code written here is underneath the .text.rs_start section.
     The _start section is then placed above all else by the linker script. */
@@ -51,39 +54,40 @@ mod fs;
 #[no_mangle]
 pub extern "C" fn _rs_start(drive_number: u32) -> ! {
 
-    // Get VGA driver static instance, clear screen from BIOS and stage-1 text
+    // Get VGA driver static instance, clear screen from BIOS and stage-1 text.
     let vga: &mut Vga = get_vga();
     vga.clear();
     vga.clear_cursor();
 
-    // Stage-2 started, say hi
-    println!("Hello world from main.rs! Current disk: ", drive_number);
+    // Initialize Fat12 "driver" as mutable: reading would change its state
+    // since we need to buffer root directories and FAT entries when needed.
+    let mut fat12: FS = FS::new(drive_number as u8);
 
-    // Initialize Fat12 "driver"
-    let fat12: FS = FS::new(drive_number as u8);
-
-    // Find kernel file
-    let file_name = b"KERNEL  BIN";//"STAGE-2 BIN";
-    let mut file: File = match fat12.file_open(file_name) {
-        None => panic!("File not found!"),
-        Some(f) => f
+    // Search the Kernel binary and get a File instance.
+    // The File contains a copy of the associated entry metadata and a buffer
+    // to avoid having a reference bound to fs lifetime, which is mutable.
+    let mut file: File = match fat12.file_open(KERNEL_FILE) {
+        Some(f) => f,
+        None => panic!("File not found!")
     };
 
+    // Load Kernel binary to memory one sector (buffer size) at a time
     let size: u32 = file.metadata.file_size; // In bytes
     let mut read: u32 = 0;                   // In bytes
     while read < size {
         fat12.file_read(&mut file);
         read += file.buffer.len() as u32;
-        print!("\rBuffered ", read, " of ", size, " bytes");
+
+        // TODO: load kernel code somewhere else in memory...?
+        //> Debug logs
+        let ptr_str: &[u8] = &file.buffer[..];
+        println!("File content value:\r\n", ptr_str);
+        println!("Buffered ", read, " of ", size, " bytes");
+        break;
     }
 
-    //> Debug logs
-    //>let ptr = unsafe { core::slice::from_raw_parts(&file.buffer as *const u8, File::BUFFER_SIZE * File::SECTION_SIZE) };
-    //>let ptr_str = &ptr[..size as usize];
-    //>println!("\r\nFile content value:\r\n", ptr_str);
-
     // Stage-2 completed, start the kernel
-    println!("\r\nStarting Kernel... TODO!");
+    println!("Starting Kernel... TODO!");
 
     // Do nothing until the end of time - 'never' (!) return type
     loop {}
@@ -96,8 +100,8 @@ pub extern "C" fn _rs_start(drive_number: u32) -> ! {
 fn panic(_info: &PanicInfo) -> ! {
 
     // Print panic reason
-    let err = _info.message().unwrap().as_str().expect("Panic!");
-    println!("\r\nPanic: ", err);
+    let err: &str = _info.message().unwrap().as_str().expect("Panic!");
+    println!("Panic: ", err);
     
     // Do nothing until the end of time - 'never' (!) return type
     loop {}
