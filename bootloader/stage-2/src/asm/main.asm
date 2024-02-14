@@ -222,15 +222,20 @@ ps2_wait_obuf_full:
     jz ps2_wait_obuf_full                           ; If the buffer is empty, keep waiting
     ret
 
-; ==== GDT =================================================================================================== ;
+; ==== DATA ================================================================================================== ;
 section .data
+drive_number:                                       ; Store drive number value to pass to Rust module
+    dd 0
 
+section .rodata
 ; Print method strings
 text16r_test: db `Real!`, LF, CR, 0
 text16r_a20_enabling: db `Enabling A20 Line...`, LF, CR, 0
 text16r_a20_disabled: db `Could not enable A20 Line`, LF, CR, 0
 text16r_a20_enabled: db `A20 Line Enabled`, LF, CR, 0
 
+; ==== GDT =================================================================================================== ;
+section .rodata.gdt
 ; Global Descriptor Table
 gdt:
     .selector_empty:                                ;* 1st: must be empty
@@ -271,6 +276,3 @@ gdt:
 gdt_descriptor:
     dw gdt_descriptor - gdt - 1                     ; GDT size - 1 (16b)
     dd gdt                                          ; GDT address (32b)
-
-drive_number:                                       ; Store drive number value to pass to Rust module
-    dd 0

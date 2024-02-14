@@ -19,6 +19,9 @@ pub struct DirectoryEntry {
 
 /* ==== TYPE METHODS ======================================================== */
 impl DirectoryEntry {
+    /** Checks if the entry attributes indicate a directory-type file. */
+    pub fn is_directory(&self) -> bool { self.attributes & 0x10 > 0 }
+
     /* Gets the u32 cluster number of the described file. *
     pub fn get_cluster(&self) -> u32 {
         ((self.upper_first_cluster as u32) << 16) | self.lower_first_cluster as u32

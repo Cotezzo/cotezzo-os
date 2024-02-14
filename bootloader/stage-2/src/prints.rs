@@ -30,7 +30,12 @@ macro_rules! println {
         let vga = get_vga();
         {
             $(
-                let s = $arg.to_string();
+                // To avoid error "temporary value dropped while borrowed",
+                // when using a reference returned from a method as a parameter,
+                // he value is assigned to a variable (s) so that the compiler
+                // can use it as the owner of the reference.
+                let s = $arg;
+                let s = s.to_string();
                 vga.print(s);
             )*
         }

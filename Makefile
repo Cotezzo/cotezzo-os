@@ -58,7 +58,8 @@ ${TARGET_IMG}: ${TARGET_DIR} stage-1 stage-2 kernel
 	mkfs.fat -F 12 ${TARGET_IMG} -n "PORK_OS"
 	dd if=${TARGET_STAGE_1_BIN} of=${TARGET_IMG} conv=notrunc
 	mcopy -i ${TARGET_IMG} ${TARGET_STAGE_2_BIN} "::stage-2.bin"
-	mcopy -i ${TARGET_IMG} ${TARGET_KERNEL_BIN} "::kernel.bin"
+	mmd -i ${TARGET_IMG} "::kernel"
+	mcopy -i ${TARGET_IMG} ${TARGET_KERNEL_BIN} "::kernel/main.bin"
 
 # Create stage-1 bootloader binary from assembly source.
 stage-1: #${TARGET_STAGE_1_BIN}:

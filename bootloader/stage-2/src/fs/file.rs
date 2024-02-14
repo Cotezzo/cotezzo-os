@@ -12,7 +12,10 @@ pub struct File {
     /** Buffered sectors of the current cluster stored in the buffer */
     pub current_cluster_read_sectors: u16,
     /** Buffer used to store the content of the file during read operations */
-    pub buffer: [u8; File::SECTION_SIZE * File::BUFFER_SIZE]
+    pub buffer: [u8; File::SECTION_SIZE * File::BUFFER_SIZE],
+
+    /** Flag that indicates if the buffered cluster is the last one. */
+    pub finished: bool
 }
 
 /* ==== TYPE CONSTANTS ====================================================== */
@@ -30,10 +33,23 @@ impl File {
         In order to fill it, use the file_read method of a Fat12 instance. */
     pub fn new(metadata: DirectoryEntry) -> Self {
         Self {
+            finished: false,
             current_cluster: metadata.lower_first_cluster,
             current_cluster_read_sectors: 0,
             buffer: unsafe { zeroed() },
             metadata
         }
+    }
+}
+
+/* ==== TYPE METHODS ======================================================== */
+impl File {
+    /** Creates a File instance, which contains metadata and reading state.
+        The file content buffer is also initialized, but it's empty.
+        In order to fill it, use the file_read method of a Fat12 instance. */
+    pub fn reset(&mut self) -> () {
+        self.finished = false;
+        self.current_cluster = self.metadata.lower_first_cluster;
+        self.current_cluster_read_sectors = 0;
     }
 }
