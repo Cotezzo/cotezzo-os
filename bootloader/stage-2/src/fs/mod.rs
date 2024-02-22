@@ -1,5 +1,5 @@
 use core::{slice::from_raw_parts, mem::zeroed};
-//use crate::{println, prints::ToString, vga::get_vga};
+//>use crate::{println, prints::{ToString, ToStringBase}, vga::get_vga};
 
 use self::{bootsector::BootSector, directory::DirectoryEntry, file::File};
 
@@ -10,9 +10,9 @@ pub mod file;
 
 /* ==== ASM EXTERN METHODS ================================================== */
 extern "C" {
-    pub fn _c_disk_reset(drive: u8) -> bool;
-    pub fn _c_disk_read(drive: u8, cylinder: u16, head: u8, sector: u8, count: u8, addr: *const u8) -> bool;
-    pub fn _c_disk_get_params(drive: u8, drive_type: *const u8, max_cylinders: *const u16, max_heads: *const u8, max_sectors: *const u8) -> bool;
+    fn _c_disk_reset(drive: u8) -> bool;
+    fn _c_disk_read(drive: u8, cylinder: u16, head: u8, sector: u8, count: u8, addr: *const u8) -> bool;
+    fn _c_disk_get_params(drive: u8, drive_type: *const u8, max_cylinders: *const u16, max_heads: *const u8, max_sectors: *const u8) -> bool;
 }
 
 /* ==== TYPE DEFINITION ===================================================== */
@@ -259,13 +259,12 @@ impl FS {
 
     /// The maximum number of directory entries that can be stored in the file
     /// buffer depends on the file buffer size and entry size (32).
-    const ENTRIES_PER_FILE_BUFFER: usize = File::BUFFER_SIZE * File::SECTION_SIZE / 32 - 1;
+    const ENTRIES_PER_FILE_BUFFER: usize = File::BUFFER_SIZE * File::SECTOR_SIZE / 32 - 1;
 
     /// Searches for the entry with the provided name in the given directory.
     /// The given file is reset and read, then the loaded directory entries are
     /// checked against the given entry name. If an entry that matches it is
     /// found, it is returned.<br>
-    /// TODO: only take DirectoryEntry (metadata) in input and create file here
     pub fn get_entry_from_directory(&mut self, file: &mut File, entry_name: &[u8]) -> Option<&DirectoryEntry> {
         // Since we need to seek each entry in the directory, we want to start
         // from the first - if for some reason the file has already been read,
@@ -276,7 +275,7 @@ impl FS {
         self.file_read(file);
 
         // Cast byte buffer to entries buffer so that we can loop through them
-        let dir_buffer: &[DirectoryEntry] =  unsafe { from_raw_parts(&file.buffer as *const u8 as *const DirectoryEntry, File::SECTION_SIZE * File::BUFFER_SIZE / 32) };
+        let dir_buffer: &[DirectoryEntry] =  unsafe { from_raw_parts(&file.buffer as *const u8 as *const DirectoryEntry, File::SECTOR_SIZE * File::BUFFER_SIZE / 32) };
         
         // Initialize starting index, max/min values for first chunk of data,
         // which depend on the file buffer size.
@@ -325,15 +324,24 @@ impl FS {
     }
 
     /// Fills the File buffer with its actual content read from the disk.
+    /// The method calls [`Self::file_read_at()`] with buffer pointer and size.
+    pub fn file_read(&mut self, file: &mut File) -> usize {
+        // Get content buffer raw pointer and maximum size
+        let addr: *const u8 = &file.buffer as *const u8;
+        let sectors: usize = file.buffer.len() / File::SECTOR_SIZE;
+        return self.file_read_at(file, addr, sectors);
+    }
+
     /// If the File cluster info are present, they're used to load the next
     /// data to the buffer, overriding the previous content.
     /// Reading file content could involve following the FAT for cluster lookup
     /// in non buffered entries (if any is buffered), so reading from disk and
     /// updating stored data might happen (hence, the mutable reference).
-    pub fn file_read(&mut self, file: &mut File) -> () {
-        // Reset finished property to false, if the file cannot be contained in
-        // the buffer, caller could use it and would expect it at false.
-        file.finished = false;
+    /// If the file has been completely read, the method immediatly returns.
+    /// In order to read the file from the start again, call File.reset first.
+    pub fn file_read_at(&mut self, file: &mut File, mut addr: *const u8, mut sectors: usize) -> usize {
+        // If the file has already been fully read, exit.
+        if file.is_fully_read() { return 0; }
 
         // Get the first cluster the data is stored in from the entry.
         // This cluster number already accounts for the two empty FAT entries.
@@ -345,9 +353,8 @@ impl FS {
         // To keep track of the sectors read for each cluster
         let mut current_cluster_read_sectors: u16 = file.current_cluster_read_sectors;
 
-        // Get content buffer raw pointer and maximum size
-        let mut addr: *const u8 = &file.buffer as *const u8;
-        let mut buffer_capacity: u16 = (file.buffer.len() / File::SECTION_SIZE) as u16;
+        let addr_old: *const u8 = addr;
+        //>let sectors_old: usize = sectors;
 
         loop {
             // Get offset of the given cluster in the disk
@@ -361,15 +368,15 @@ impl FS {
             // If the leftover buffer is smaller than the current count, only
             // read what fits in.
             let count: u16 = cluster_size - current_cluster_read_sectors;
-            let count: u16 = core::cmp::min(count, buffer_capacity as u16);
+            let count: u16 = core::cmp::min(count, sectors as u16);
 
             // Write at load_addr disk data from given offset (Root Directory)
             self.read_disk(lba, count as u8, addr, file.metadata.name.as_slice());
 
             // After reading, update read sectors and leftover buffer capacity
-            buffer_capacity -= count;
+            sectors -= count as usize;
             current_cluster_read_sectors += count;
-            addr = unsafe { addr.add(count as usize * File::SECTION_SIZE) };
+            addr = unsafe { addr.add(count as usize * File::SECTOR_SIZE) };
 
             // If the cluster has been fully read, read next cluster:
             // reset read sectors count, retrieve next cluster from FAT
@@ -384,22 +391,29 @@ impl FS {
                 };
             }
 
-            // If cluster number is >= FF8, that was the last cluster
-            // Reset file read metadata and exit
+            // If cluster number is >= FF8, that was the last cluster, exit
             if current_cluster >= 0x0FF8 {
-                file.current_cluster = file.metadata.lower_first_cluster;
-                file.current_cluster_read_sectors = 0;
-                file.finished = true;
+                file.current_cluster = current_cluster;
                 break;
             }
 
             // If the buffer is full, save reading metadata and exit
-            if buffer_capacity == 0 {
+            if sectors == 0 {
                 file.current_cluster = current_cluster;
                 file.current_cluster_read_sectors = current_cluster_read_sectors;
                 break;
             }
         }
+
+        // Return number of bytes read from disk; value is not aligned with
+        // file size since only chunks of SECTOR_SIZE can be read.
+        let read_bytes: usize = addr as usize - addr_old as usize;
+
+        //>println!("Read ", read_bytes, " bytes at ", addr_old.to_string_base(16));
+        //>let slice: &[u8] = unsafe { core::slice::from_raw_parts(addr_old, sectors_old * File::SECTOR_SIZE) };
+        //>println!("File content value:\r\n", slice);
+
+        read_bytes
     }
 }
 

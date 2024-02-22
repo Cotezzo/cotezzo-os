@@ -14,7 +14,7 @@ build-std = ["core", "compiler_builtins"]
 # normally provided by the C library on the system.
 # One could implement the functions with the #[no_mangle] attribute (dangerous).
 # compiler_builtins contains implementations for these functions, they are just
-# disabled by default to not collide with the implementations from the C library.
+# disabled by default to not collide with implementations from the C library.
 build-std-features = ["compiler-builtins-mem"]
 
 # ==== BUILD FLAGS =========================================================== #
@@ -22,7 +22,7 @@ build-std-features = ["compiler-builtins-mem"]
 # To avoid specifying the --target option with our custom triple .json
 target = "i686-code32-stage-2.json"
 
-#! Flags can be declared in the target.json file, they've been moved there
+#! Flags can be declared in the <target>.json file, they have been moved there
 rustflags = [
     # Specify custom linker script for our binary
     #> "-C", "link-arg=--script=./link.ld",

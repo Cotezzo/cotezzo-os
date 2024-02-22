@@ -30,6 +30,13 @@ mod fs;
 /* ==== CONSTANTS =========================================================== */
 const KERNEL_PATH: &[u8] = b"/kernel/main.bin";
 
+// Define function type as its interface - to be used for function pointers.
+type KernelStart = extern "C" fn() -> !;
+
+/// Stack pointer stars from 0xFFFF, place kernel just above it.
+/// Could also directly define the pointer as '*const extern "C" fn()->!'.
+const KERNEL_MEM_OFFSET: *const KernelStart = 0x10000 as *const KernelStart;
+
 /* ==== ENTRY POINT ========================================================= */
 //// All the code written here is underneath the .text.rs_start section.
 //// The _start section is then placed above all else by the linker script.
@@ -74,23 +81,24 @@ pub extern "C" fn _rs_start(drive_number: u32) -> ! {
     println!("Succesfully read file at ", KERNEL_PATH);
 
     // Load Kernel binary to memory one sector (buffer size) at a time
-    //>let size: u32 = file.metadata.file_size; // In bytes
-    //>let mut read: u32 = 0;                   // In bytes
-    while !file.finished {
-        fat12.file_read(&mut file);
-        //>read += file.buffer.len() as u32;
-
-        // TODO: load kernel code somewhere else in memory...?
-        //>println!("File content value:\r\n", &file.buffer[..]);
-        //>println!("Buffered ", read, " of ", size, " bytes");
+    let addr: *const u8 = KERNEL_MEM_OFFSET as *const u8;
+    let buffer_capacity: usize = 1;
+    while !file.is_fully_read() {
+        fat12.file_read_at(&mut file, addr, buffer_capacity);
     }
-
+    
     /* ==== FILE EXECUTION ================================================== */
     // Stage-2 completed, start the kernel
-    println!("Starting Kernel... TODO!");
+    println!("Starting Kernel..!");
 
-    // Do nothing until the end of time - 'never' (!) return type
-    loop {}
+    // ! This line won't work, and there is probably no way to make it work.
+    // ! The actual transmute implementation is instrinsic (compiler magic).
+    // https://users.rust-lang.org/t/mem-transmute-implementation-source/29060/4
+    //let _kernel_start: KernelStart = unsafe { *KERNEL_MEM_OFFSET };
+
+    // Transmute defined pointer into function and call it - start the kernel.
+    let _kernel_start: KernelStart = unsafe { core::mem::transmute(KERNEL_MEM_OFFSET) };
+    _kernel_start();
 }
 
 /* ==== PANIC HANDLER ======================================================= */
