@@ -28,14 +28,16 @@ mod prints;
 mod fs;
 
 /* ==== CONSTANTS =========================================================== */
+/// Define kernel binary absolute path in the disk
 const KERNEL_PATH: &[u8] = b"/kernel/main.bin";
 
-// Define function type as its interface - to be used for function pointers.
+/// Define function type as its interface - to be used for function pointers.
 type KernelStart = extern "C" fn() -> !;
 
 /// Stack pointer stars from 0xFFFF, place kernel just above it.
 /// Could also directly define the pointer as '*const extern "C" fn()->!'.
 const KERNEL_MEM_OFFSET: *const KernelStart = 0x10000 as *const KernelStart;
+// 0x00007E00 - 0x0007FFFF (480.5 KiB) - Conventional memory 
 
 /* ==== ENTRY POINT ========================================================= */
 //// All the code written here is underneath the .text.rs_start section.
@@ -80,11 +82,21 @@ pub extern "C" fn _rs_start(drive_number: u32) -> ! {
     };
     println!("Succesfully read file at ", KERNEL_PATH);
 
-    // Load Kernel binary to memory one sector (buffer size) at a time
-    let addr: *const u8 = KERNEL_MEM_OFFSET as *const u8;
-    let buffer_capacity: usize = 1;
+    // Define src and dst pointers - file buffer content and kernel fn pointer
+    let src = &file.buffer as *const u8;
+    let mut dst: *mut u8 = KERNEL_MEM_OFFSET as *mut u8;
+
+    // Load {count} bytes from disk to file buffer one sector at a time.
+    // Copy buffer content to kernel pointer; increment for next iteration.
+    // ! file_read_at could be used to avoid memcpy, but we'd be limited at the
+    // ! maximum real mode addressable memory (0xFFFFF, 1MB, with 20bit bus and
+    // ! segmented model), breaking for KERNEL_OFFSET + KERNEL_SIZE < 0xFFFFF.
     while !file.is_fully_read() {
-        fat12.file_read_at(&mut file, addr, buffer_capacity);
+        let count: usize = fat12.file_read(&mut file);
+        unsafe {
+            core::ptr::copy_nonoverlapping(src, dst, count);
+            dst = dst.add(count);
+        };
     }
     
     /* ==== FILE EXECUTION ================================================== */
