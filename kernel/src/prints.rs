@@ -1,0 +1,380 @@
+
+/* ==== PUBLIC MACROS ======================================================= */
+// TODO: implement print! and println! with "{}" placeholders
+// TODO: implement ToString trait for floats, doubles
+// TODO: implement number formatting for numbers (hex, binary...)
+
+/** Prints the given parameters as characters to the screen.
+ *  Supports strings, \[u8\] slices and unsigned integer types.
+ *  This crate implements the ToString trait for these types. */
+#[macro_export]
+macro_rules! print {
+    ($($arg:expr),*) => {
+        let vga = get_vga();
+        {
+            $(
+                let s = $arg.to_string();
+                vga.print(s);
+            )*
+        }
+    };
+}
+
+/** Prints the given parameters as characters to the screen.
+ *  Supports strings, \[u8\] slices and unsigned integer types.
+ *  This crate implements the ToString trait for these types.
+ *  Creates a new line after printing. */
+#[macro_export]
+macro_rules! println {
+    ($($arg:expr),*) => {
+        let vga = get_vga();
+        {
+            $(
+                // To avoid error "temporary value dropped while borrowed",
+                // when using a reference returned from a method as a parameter,
+                // he value is assigned to a variable (s) so that the compiler
+                // can use it as the owner of the reference.
+                let s = $arg;
+                let s = s.to_string();
+                vga.print(s);
+            )*
+        }
+        vga.ln();
+    };
+
+}
+
+/* ==== TRAIT DEFINITION ==================================================== */
+/*  Define ToString trait so that we can implement a custom to_string function
+    for each type we need to print with the print! macro.
+    The trait is implement by defining a to_string method that returns a
+    reference to a static string. */
+pub trait ToString { fn to_string(&self) -> &[u8]; }
+pub trait ToStringBase { fn to_string_base(&self, base: u8) -> &[u8]; }
+
+/* ==== STATIC BUFFERS AND DIGITS =========================================== */
+/** List of possible digits for a number to print.
+    Only supports up to base 16 (symbols 0-F). */
+const DIGITS: &[u8] = b"0123456789ABCDEF";
+const BUFFER_SIZE: usize = 129;
+/** Static buffer to store ASCII representation without allocator.
+    Maximum size is 128 for u128 number (base 2), +1 for '-' if needed. */
+static mut BUFFER: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
+
+/* ==== TRAIT IMPLEMENTATION FOR STRINGS ==================================== */
+/*  Implement the ToString trait for the static &[u8] type: return self. */
+impl ToString for &[u8] {
+    fn to_string(&self) -> &[u8] { self }
+}
+
+/*  Implement the ToString trait for the static &str type: return bytes. */
+impl ToString for &str {
+    fn to_string(&self) -> &[u8] { self.as_bytes() }
+}
+
+/* ==== TRAIT IMPLEMENTATION FOR BOOLEANS =================================== */
+/*  Implement the ToString trait for the bool type: check and return string. */
+impl ToString for bool {
+    fn to_string(&self) -> &'static[u8] {
+        if *self { return b"true"; }
+        b"false"
+    }
+}
+
+/* ==== TRAIT IMPLEMENTATION FOR UNSIGNED INTEGERS ========================== */
+/*  To implement the conversion to unsigned integer to string, we can use the
+    same logic for each type, so a macro is used to generate the same impl
+    for u8, u16, u32, u64 and usize. */
+#[macro_export]
+macro_rules! to_string_impl_uint {
+    // Match ty: type for which we are implementing the to_string method.
+    // Match base: radix for number representation.
+    ($ty:ty) => {
+
+        // Start code implementing ToString trait for the matched uint type
+        impl ToStringBase for $ty {
+            fn to_string_base(&self, base: u8) -> &'static[u8] {
+
+                // Init buffer index to last position and mutable copy of number
+                let mut i: usize = BUFFER_SIZE - 1;
+                let mut num: $ty = *self;
+
+                // If the base is not 10, we want to also print the leading 0s:
+                // calculate maximum digits for the given base and subtract from
+                // minimum index. Minimum index is then used in the loop to
+                // keep adding 0s until the minimum number size is reached.
+                // If the base is 10, minimum size is 0 and it is not used.
+                let mut min_i = BUFFER_SIZE;
+                if base != 10 {
+                    let mut max_value = <$ty>::MAX;
+                    while max_value > 0 {
+                        max_value /= base as $ty;
+                        min_i -= 1;
+                    }
+                }
+
+                loop {
+                    // Divide number/$base to get the reminder (rightmost digit)
+                    // and compute next number value (shift digits to right).
+                    // Casting the remainder is safe unless $base > usize::MAX
+                    // (or 16 actually, DIGITS won't support it)...
+                    unsafe { BUFFER[i] = DIGITS[(num % base as $ty) as usize]; }
+                    num /= base as $ty;
+
+                    // If there are no digits left to print, exit;
+                    // Else, update buffer index to previous position and loop
+                    if num == 0 && i <= min_i { break; }
+                    i -= 1;
+                }
+
+                // Return from ith to last buffered values
+                unsafe { &BUFFER[i..] }
+                
+            }
+        }
+
+        impl ToString for $ty {
+            fn to_string(&self) -> &[u8] {
+                self.to_string_base(10)
+            }
+        }
+    };
+}
+
+/*  Implement the ToString trait for u8 using the to_string_impl_uint macro. 
+    Max size: 3 (0-255). */
+to_string_impl_uint!(u8);
+
+/*  Implement the ToString trait for u16 using the to_string_impl_uint macro.
+    Max size: 5 (0-65_535). */
+to_string_impl_uint!(u16);
+    
+/*  Implement the ToString trait for u32 using the to_string_impl_uint macro.
+    Max size: 10 (0-4_294_967_295). */
+to_string_impl_uint!(u32);
+    
+/*  Implement the ToString trait for u64 using the to_string_impl_uint macro.
+    Max size: 20 (0-18_446_744_073_709_551_615). */
+to_string_impl_uint!(u64);
+
+/*  Implement the ToString trait for u64 using the to_string_impl_uint macro.
+    Max size: 39 (0-340_282_366_920_938_463_463_374_607_431_768_211_455). */
+    to_string_impl_uint!(u128);
+    
+/*  Implement the ToString trait for usize using the to_string_impl_uint macro.
+    Max size: see max size for u32 and u64 types. */
+to_string_impl_uint!(usize);
+
+
+/* ==== TRAIT IMPLEMENTATION FOR SIGNED INTEGERS ============================ */
+/*  To implement the conversion to signed integer to string, we can use the
+    same logic for each type, so a macro is used to generate the same impl
+    for i8, i16, i32, i64 and isize. */
+#[macro_export]
+macro_rules! to_string_impl_int {
+    // Match ty: type for which we are implementing the to_string method.
+    // Match uty: unsigned type of same length of original type, for casting.
+    ($ty:ty, $uty:ty) => {
+
+        // Start code implementing ToString trait for the matched int type
+        impl ToStringBase for $ty {
+            fn to_string_base(&self, base: u8) -> &'static[u8] {
+
+                // Init buffer index to last position and mutable copy of number
+                let mut i: usize = BUFFER_SIZE - 1;
+                let num: $ty = *self;
+                
+                // If the number is positive, we treat it as a unsigned int,
+                // since the value is the same. Call the unsigned impl.
+                // If the base is not 10, we want to print the raw value, so
+                // we treat is as an unsigned int as well (es: 15u8 --> 0F).
+                if num >= 0 || base != 10 {
+                    // return (num as $uty).to_string_base(base);
+
+                    //>=========================================================
+                    // Init buffer index to last position and mutable copy of number
+                    let mut i: usize = BUFFER_SIZE - 1;
+                    let mut num: $uty = num as $uty;
+
+                    // If the base is not 10, we want to also print the leading 0s:
+                    // calculate maximum digits for the given base and subtract from
+                    // minimum index. Minimum index is then used in the loop to
+                    // keep adding 0s until the minimum number size is reached.
+                    // If the base is 10, minimum size is 0 and it is not used.
+                    let mut min_i = BUFFER_SIZE;
+                    if base != 10 {
+                        let mut max_value = <$uty>::MAX;
+                        while max_value > 0 {
+                            max_value /= base as $uty;
+                            min_i -= 1;
+                        }
+                    }
+
+                    loop {
+                        // Divide number/$base to get the reminder (rightmost digit)
+                        // and compute next number value (shift digits to right).
+                        // Casting the remainder is safe unless $base > usize::MAX
+                        // (or 16 actually, DIGITS won't support it)...
+                        unsafe { BUFFER[i] = DIGITS[(num % base as $uty) as usize]; }
+                        num /= base as $uty;
+
+                        // If there are no digits left to print, exit;
+                        // Else, update buffer index to previous position and loop
+                        if num == 0 && i <= min_i { break; }
+                        i -= 1;
+                    }
+
+                    // Return from ith to last buffered values
+                    return unsafe { &BUFFER[i..] }
+                    //>=========================================================
+
+
+                }
+
+                // If number is negative and radix is 10, convert to positive
+                // value and cast to unsigned integer, keeping it as signed
+                // would break the divisions (-1 / base is not what we want...).
+                // -2: 0b11111110 --> ~ --> 0b00000001 --> + 1 --> 0b00000010: 2
+                let mut num: $uty = (!num + 1) as $uty;
+                let base: $uty = base as $uty;
+
+                loop {
+                    // Divide number/$base to get the reminder (rightmost digit)
+                    // and compute next number value (shift digits to right).
+                    // Casting the remainder is safe unless $base > usize::MAX
+                    // (or 16 actually, DIGITS won't support it)...
+                    unsafe { BUFFER[i] = DIGITS[(num % base) as usize]; }
+                    num /= base;
+
+                    // If there are no digits left to print, exit;
+                    // Else, update buffer index to previous position and loop
+                    i -= 1;
+                    if num == 0 { break; }
+                }
+
+                // If number is negative, add '-' symbol in previous position
+                unsafe { BUFFER[i] = b'-'; }
+
+                // Return from ith to last buffered values
+                unsafe { &BUFFER[i..] }
+            }
+        }
+
+        impl ToString for $ty {
+            fn to_string(&self) -> &[u8] {
+                self.to_string_base(10)
+            }
+        }
+    };
+}
+
+/*  Implement the ToString trait for u8 using the to_string_impl_uint macro. 
+    Max size: 3 (0-255). */
+to_string_impl_int!(i8, u8);
+
+/*  Implement the ToString trait for u16 using the to_string_impl_uint macro.
+    Max size: 5 (0-65_535). */
+to_string_impl_int!(i16, u16);
+    
+/*  Implement the ToString trait for u32 using the to_string_impl_uint macro.
+    Max size: 10 (0-4_294_967_295). */
+to_string_impl_int!(i32, u32);
+    
+/*  Implement the ToString trait for u64 using the to_string_impl_uint macro.
+    Max size: 20 (0-18_446_744_073_709_551_615). */
+to_string_impl_int!(i64, u64);
+
+/*  Implement the ToString trait for u64 using the to_string_impl_uint macro.
+    Max size: 20 (0-340_282_366_920_938_463_463_374_607_431_768_211_455). */
+    to_string_impl_int!(i128, u128);
+
+/*  Implement the ToString trait for isize using the to_string_impl_uint macro.
+    Max size: see max size for i32 and i64 types. */
+to_string_impl_int!(isize, usize);
+
+/* ==== TRAIT IMPLEMENTATION FOR POINTERS =================================== */
+/*  For pointers, the implementation is just the same as the unsigned integer
+    types, all it takes is a type cast. */
+#[macro_export]
+macro_rules! to_string_impl_ptr {
+    // Match ty: type for which we are implementing the to_string method.
+    ($ty:ty) => {
+        impl ToStringBase for $ty {
+            fn to_string_base(&self, base: u8) -> &[u8] {
+                // (*self as usize).to_string_base(base)
+
+                //> ============================================================
+                // Init buffer index to last position and mutable copy of number
+                let mut i: usize = BUFFER_SIZE - 1;
+                let mut num: usize = *self as usize;
+
+                // If the base is not 10, we want to also print the leading 0s:
+                // calculate maximum digits for the given base and subtract from
+                // minimum index. Minimum index is then used in the loop to
+                // keep adding 0s until the minimum number size is reached.
+                // If the base is 10, minimum size is 0 and it is not used.
+                let mut min_i = BUFFER_SIZE;
+                if base != 10 {
+                    let mut max_value = usize::MAX;
+                    while max_value > 0 {
+                        max_value /= base as usize;
+                        min_i -= 1;
+                    }
+                }
+
+                loop {
+                    // Divide number/$base to get the reminder (rightmost digit)
+                    // and compute next number value (shift digits to right).
+                    // Casting the remainder is safe unless $base > usize::MAX
+                    // (or 16 actually, DIGITS won't support it)...
+                    unsafe { BUFFER[i] = DIGITS[(num % base as usize) as usize]; }
+                    num /= base as usize;
+
+                    // If there are no digits left to print, exit;
+                    // Else, update buffer index to previous position and loop
+                    if num == 0 && i <= min_i { break; }
+                    i -= 1;
+                }
+
+                // Return from ith to last buffered values
+                unsafe { &BUFFER[i..] }
+                //> ============================================================
+            }
+        }
+
+        impl ToString for $ty {
+            fn to_string(&self) -> &[u8] {
+                //(*self as usize).to_string()
+
+                //> ============================================================
+                self.to_string_base(10)
+                //> ============================================================
+            }
+        }
+    };
+}
+
+to_string_impl_ptr!(*const u8);
+to_string_impl_ptr!(*const u16);
+to_string_impl_ptr!(*const u32);
+to_string_impl_ptr!(*const u64);
+to_string_impl_ptr!(*const u128);
+to_string_impl_ptr!(*const usize);
+to_string_impl_ptr!(*const i8);
+to_string_impl_ptr!(*const i16);
+to_string_impl_ptr!(*const i32);
+to_string_impl_ptr!(*const i64);
+to_string_impl_ptr!(*const i128);
+to_string_impl_ptr!(*const isize);
+to_string_impl_ptr!(*mut u8);
+to_string_impl_ptr!(*mut u16);
+to_string_impl_ptr!(*mut u32);
+to_string_impl_ptr!(*mut u64);
+to_string_impl_ptr!(*mut u128);
+to_string_impl_ptr!(*mut usize);
+to_string_impl_ptr!(*mut i8);
+to_string_impl_ptr!(*mut i16);
+to_string_impl_ptr!(*mut i32);
+to_string_impl_ptr!(*mut i64);
+to_string_impl_ptr!(*mut i128);
+to_string_impl_ptr!(*mut isize);

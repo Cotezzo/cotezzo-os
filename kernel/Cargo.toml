@@ -1,0 +1,18 @@
+# Cargo Package Metadata
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+
+# By default Rust runs destructors of all stack vars when panicking (unwinding).
+# This way, all used memory is freed and parent thread can continue execution.
+# Unwinding is complicated and requires OS-specific libs: we can't use it.
+# Rust provides an option to abort on panic instead.
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+# Specify target architecture (32-bit)
+#> [target.'cfg(target_arch = "x86")'.dependencies]
