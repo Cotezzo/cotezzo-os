@@ -51,8 +51,12 @@ The output directory for binary and image files is the `target` directory.
 - BIOS, Bootloader and Kernel
 - Memory Segmentation
 - Stack
-- Signal Interrupts
+- Interrupts
 - CHS and LBA addressing schemes
 - FAT file system
+- Real Mode vs Protected Mode
+- Port Mapped I/O
+- VGA (Text Mode)
+- GDT, IDT
 
 The source code is well commented anyway.

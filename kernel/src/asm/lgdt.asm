@@ -5,8 +5,8 @@ global _c_load_gdt
 ;* the provided GDT Descriptor in input.
 ;* Input parameters (from last pushed / left):
 ;* - GDT Descriptor Address
-;* - GDT entry address to be loaded as Code Segment
-;* - GDT entry address to be loaded as Data Segment
+;* - GDT entry offset to be loaded as Code Segment
+;* - GDT entry offset to be loaded as Data Segment
 ; This method implements the C calling convention.
 _c_load_gdt:
     [bits 32]

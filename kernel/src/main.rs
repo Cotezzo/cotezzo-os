@@ -6,17 +6,14 @@
 
 /* ==== MODULES ============================================================= */
 use core::panic::PanicInfo;
-use gdt::gdt::Gdt;
-use gdt::gdtdescriptor::GdtDescriptor;
 use vga::get_vga;
 use prints::ToString;
-use crate::gdt::init_gdt;
-use crate::prints::ToStringBase;
 
 mod vga;    // Use VGA module
 mod pmio;   // Make PMIO module visible to VGA module
 mod prints;
 mod gdt;
+mod idt;
 
 
 /* ==== ENTRY POINT ========================================================= */
@@ -25,8 +22,11 @@ mod gdt;
     // Clear text and cursor from stage-2
     get_vga().clear_screen();
 
-    init_gdt();
-    
+    // Load kernel GDT and IDT
+    gdt::init();
+    idt::init();
+
+    // TODO: something...
     println!("Kernel starting..!");
 
     // Do nothing until the end of time - 'never' (!) return type
