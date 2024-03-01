@@ -4,16 +4,16 @@ Simple and useless operating system developed following guides and documentation
 Not aiming to turn this in a complete and functional operating system, but trying to implement as many functionalities as possible for the sake of learning.
 
 ## Structure
-As of now, the project only supports BIOS; has a stage-1 bootloader written in assembly (nasm), a stage-2 bootloader written in Rust (for fun), and a kernel.
-The stage-1 is working as intended: it loads from the FAT12 fs the stage-2 into memory and executes it.
-The stage-2 is correctly invoked but not yet implemented: it should collect data from the bios and prepare the environment for the kernel.
-The kernel is not yet loaded into memory nor implemented (the current file is just a placeholder).
+As of now, the project only supports BIOS; has a stage-1 bootloader written in assembly (nasm), a stage-2 bootloader and a kernel both written in Rust.
 
-The stage-2 is a freestanding Rust binary compiled with a custom triple for our 16bit architecture, and uses some assembly methods linked with a custom linker script.
-Building the project could take a while since recompiling the standard library from source code is required.
+The stage-1 works as intended: it loads from the FAT12 fs the stage-2 into memory and executes it.
+The stage-2 is correctly invoked and loads into memory the actual kernel binary after switching to 32 bit protected mode. The stage-2 is not yet collecting enough system informations for the kernel to use.
+
+Both the stage-2 and the kernel are freestanding Rust binaries compiled with a custom triple for 32bit architecture, and use some assembly methods linked with a custom linker script.
+Building the project could take a while since recompiling the standard library from source code may be required.
 The final binary is stripped from the ELF output file and is put in the disk image as a file.
 
-NOTE: stage-2 involves assembly and is very unpredictable in dev mode, using the release target is recommended.
+NOTE: Rust modules involve assembly and could be unpredictable in dev mode, using the release target is recommended.
 
 ## Usage
 ### Installation
@@ -56,7 +56,5 @@ The output directory for binary and image files is the `target` directory.
 - FAT file system
 - Real Mode vs Protected Mode
 - Port Mapped I/O
-- VGA (Text Mode)
-- GDT, IDT
-
-The source code is well commented anyway.
+- Text Mode VGA
+- GDT and IDT
