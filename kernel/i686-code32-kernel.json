@@ -15,7 +15,8 @@
         "ld.lld": [
 	    "--script=link.ld",
         "--Map=target/linker.map",
-        "target/lgdt.o"
+        "target/lgdt.o",
+        "target/isr.o"
         ]
     },
     "features": "-mmx,-sse,+soft-float"

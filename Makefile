@@ -20,7 +20,7 @@ BLOCK_COUNT=2880	# ~1.47MB
 
 # Define QEMU command; -fda is used to load .img file as a disk.
 # Intel Arch, 32bit (aka i386). ISA: x86-32, 32b version of x86 (16b).
-EMU=qemu-system-i386 -fda ${TARGET_IMG} -d int,cpu_reset -no-reboot -D ${TARGET_DIR}/floppy.log # -nographic > output.txt
+EMU=qemu-system-i386 -fda ${TARGET_IMG} -d int,cpu_reset -no-reboot -D ${TARGET_DIR}/porcheria-os.log # -nographic > output.txt
 
 # Define .gdb debug script file and content (\ \n for multiline support).
 GDB_SCRIPT_PATH=${TARGET_DIR}/debug-script.gdb
@@ -28,7 +28,7 @@ GDB_CONFIG="\
 \nset disassembly-flavor intel\
 \ntarget remote | ${EMU} -S -gdb stdio -m 32\
 \nlayout asm\
-\nb *0x7c00\
+\nb *0x10000\
 \nc\
 \nx/16xh 0x7dfe"
 
@@ -100,3 +100,4 @@ dbg: all
 # VIEW SOURCE ALONGSIDE DISASSEMBLY:            layout split
 # VIEW DISASSEMBLY ONLY:                        layout asm
 # VIEW RAM (ex: STACK, 16*h(2B) from $sp addr): x/16xh $sp
+# NEXT INSTRUCTION:								si

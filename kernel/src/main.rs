@@ -1,4 +1,3 @@
-
 /* ==== FEATURES ============================================================ */
 #![no_std]
 #![no_main]
@@ -12,9 +11,7 @@ use prints::ToString;
 mod vga;    // Use VGA module
 mod pmio;   // Make PMIO module visible to VGA module
 mod prints;
-mod gdt;
-mod idt;
-
+mod hal;
 
 /* ==== ENTRY POINT ========================================================= */
 #[no_mangle] pub extern "C" fn _rs_start() -> ! {
@@ -23,11 +20,14 @@ mod idt;
     get_vga().clear_screen();
 
     // Load kernel GDT and IDT
-    gdt::init();
-    idt::init();
+    hal::init();
 
     // TODO: something...
     println!("Kernel starting..!");
+    
+    unsafe { core::arch::asm!( "int 0" ); }
+    unsafe { core::arch::asm!( "int 1" ); }
+    unsafe { core::arch::asm!( "int 255" ); }
 
     // Do nothing until the end of time - 'never' (!) return type
     loop {}
