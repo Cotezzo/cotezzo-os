@@ -2,6 +2,7 @@
 #![no_std]
 #![no_main]
 #![feature(panic_info_message)]
+#![recursion_limit = "256"]
 
 /* ==== MODULES ============================================================= */
 use core::panic::PanicInfo;
@@ -25,9 +26,9 @@ mod hal;
     // TODO: something...
     println!("Kernel starting..!");
     
-    unsafe { core::arch::asm!( "int 0" ); }
-    unsafe { core::arch::asm!( "int 1" ); }
-    unsafe { core::arch::asm!( "int 255" ); }
+    //unsafe { core::arch::asm!( "int 63" ); }
+    //unsafe { core::arch::asm!( "int 201" ); }
+    unsafe { core::arch::asm!( "mov ecx, 0", "div ecx" ); }
 
     // Do nothing until the end of time - 'never' (!) return type
     loop {}

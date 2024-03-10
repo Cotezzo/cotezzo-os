@@ -29,9 +29,9 @@ mod descriptor;
 mod isr;
 
 use core::mem::zeroed;
+
 use self::entry::IdtEntry;
 use self::descriptor::IdtDescriptor;
-use self::isr::init_isrs;
 
 /* ==== TYPE DEFINITION ===================================================== */
 /// Wrapper type used to better implement methods related to the IDT.
@@ -68,5 +68,6 @@ pub fn init() {
     let descriptor: IdtDescriptor = unsafe { IDT.get_descriptor() };
     unsafe { core::arch::asm!( "lidt [eax]", in("eax") &descriptor ); }
 
-    init_isrs( unsafe { &mut IDT } );
+    // Initialize IDT with ASM method pointers
+    isr::init( unsafe { &mut IDT } );
 }

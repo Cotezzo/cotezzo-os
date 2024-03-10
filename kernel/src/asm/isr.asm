@@ -2,6 +2,16 @@
 ; Declare ISR that pushes the interrupt number and jumps to the common ISR dispatcher.
 ; If the CPU doesn't push an error code for the interrupt, also push a dummy error code (0).
 ; The ISR is also made visible to the linker so that in can be used in the Rust module.
+;! Using INT to trigger a handler that would normally be triggered by a CPU exception with an error
+;! code will cause unexpected behaviour: there is no error code on the stack (nobody pushed it).
+; https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+; "Intel® 64 and IA-32 Architectures Software Developer’s Manual: 3A"
+; There are 3 types of CPU exceptions (Section 6.5):
+; - Faults: CPU saves its state before the error - CS EIP point to faulting instruction.
+; - Trap: CPU saves its state after the error - CS EIP point to next instruction (or pointed - i.e.: jumps).
+; - Abort: No program restart, severe error.
+; Some errors (such as div by 0) are faults: the handler has to fix or stop execution, or the error would loop.
+; Section 6.15 describes the type of each of the CPU exceptions.
 %macro isr 1
     global _c_isr_%1
 
@@ -26,8 +36,8 @@ extern _rs_isr_dispatcher
 
 ; Before calling ISR, CPU pushes some registers values to save its state.
 ; If ISR is called by lower privilege-level, the stack used is switched; stack informations are also pushed.
-; No ring change saves registers:   EFLAGS, CS, EIP, ErrorCode? (for Exceptions 8, 10, 11, 12, 13, 14 17, 21)
-; Ring change saves registers:     SS, ESP, EFLAGS, CS, EIP, ErrorCode?
+; No ring change saves:         EFLAGS, CS, EIP, ErrorCode? (for Exceptions 8, 10, 11, 12, 13, 14 17, 21)
+; Ring change saves:   SS, ESP, EFLAGS, CS, EIP, ErrorCode?
 _c_isr_dispatcher:
     ; General use registers may be needed in case of exception or interrupt for further analysis
     ; Pushes (in order): EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI
