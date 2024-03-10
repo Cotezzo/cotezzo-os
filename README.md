@@ -1,4 +1,4 @@
-# Porcheria-OS
+# Cotezzo-OS
 ## Introducton
 Simple and useless operating system developed following guides and documentations.
 Not aiming to turn this in a complete and functional operating system, but trying to implement as many functionalities as possible for the sake of learning.
