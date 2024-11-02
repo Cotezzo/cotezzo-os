@@ -1,7 +1,7 @@
 // Types of interrupts:
 // - Exceptions: CPU errors during instructions execution
-// - Hardware Interupts (or Interrupt Request, IRP): handled by CPU die or
-//   Programmable Interrupt Controller, passed to CPU one by one.
+// - Hardware Interupts (or Interrupt Request, IRQ): handled by CPU die or
+//   Programmable Interrupt Controller (PIC), passed to CPU one by one.
 //   Can be enabled/disabled with the CLI, STI instructions.
 // - Software Interrupts: INT instruction, used to implement syscalls.
 //   Interrupt handlers are implemented by BIOS, Kernel...

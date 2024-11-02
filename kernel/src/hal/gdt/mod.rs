@@ -9,9 +9,9 @@ extern "C" {
 }
 
 /* ==== TYPE DEFINITION ===================================================== */
-/// Wrapper type used to better implement methods related to the IDT.
+/// Wrapper type used to better implement methods related to the GDT.
 pub struct Gdt {
-    /// List of IDT entries that associate interrupts and handler routines.
+    /// List of GDT entries that associate memory segments to flags and rules.
     entries: [GdtEntry; 3]
 }
 
@@ -50,8 +50,6 @@ impl Gdt {
 }
 
 /* ==== GDT DATA and INITIALIZATION ========================================= */
-
-
 /// Define new GDT entries - we already defined these in bootloader data, but
 /// that memory could be freed, so they are defined again in the kernel.
 ///! Needs to be const, not static - why? Idk...

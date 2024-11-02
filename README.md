@@ -1,7 +1,7 @@
 # Cotezzo-OS
 ## Introducton
 Simple and useless operating system developed following guides and documentations.
-Not aiming to turn this in a complete and functional operating system, but trying to implement as many functionalities as possible for the sake of learning.
+Not aiming to turn this into a complete and functional operating system, but trying to implement as many functionalities as possible for the sake of learning.
 
 ## Structure
 As of now, the project only supports BIOS; has a stage-1 bootloader written in assembly (nasm), a stage-2 bootloader and a kernel both written in Rust.
@@ -42,6 +42,9 @@ To create a clean project build and run the output disk with qemu, using
 - `make clean`: deletes the project and sub-projects build directories. Necessary before a
 new build if linker scripts or assembly files used in the Rust modules have been modified,
 since cargo can't watch those file for us.
+
+When using VSCode's terminal, some errors might occur during compilation.
+To avoid these errors, the GTK_PATH env variable must be unset using the command `unset GTK_PATH`.
 
 All the assembler, emulation and debugging configurations are set in the Makefile.
 The output directory for binary and image files is the `target` directory.

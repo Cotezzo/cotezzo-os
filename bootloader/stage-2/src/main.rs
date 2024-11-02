@@ -34,7 +34,7 @@ const KERNEL_PATH: &[u8] = b"/kernel/main.bin";
 /// Define function type as its interface - to be used for function pointers.
 type KernelStart = extern "C" fn() -> !;
 
-/// Stack pointer stars from 0xFFFF, place kernel just above it.
+/// Stack pointer starts from 0xFFFF, place kernel just above it.
 /// Could also directly define the pointer as '*const extern "C" fn()->!'.
 const KERNEL_MEM_OFFSET: *const KernelStart = 0x10000 as *const KernelStart;
 // 0x00007E00 - 0x0007FFFF (480.5 KiB) - Conventional memory 

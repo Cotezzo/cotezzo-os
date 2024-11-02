@@ -1,8 +1,8 @@
 ; Expose LGDT method to the linker
 global _c_load_gdt
 
-;* Calls the ASM 'lgdt' metho, loading the GDT using
-;* the provided GDT Descriptor in input.
+;* Calls the ASM 'lgdt' method, loading the GDT
+;* using the provided GDT Descriptor in input.
 ;* Input parameters (from last pushed / left):
 ;* - GDT Descriptor Address
 ;* - GDT entry offset to be loaded as Code Segment
